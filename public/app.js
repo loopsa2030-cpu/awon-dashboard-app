@@ -29,11 +29,11 @@ const T = {
     waPaidNote: 'Meta leads use the Odoo source "whatsapp paid" from 22 Sep 2026; Meta WhatsApp leads before that date are counted under WhatsApp.',
     favNote: f => `Source groups follow the Odoo favourites: ${f}.`,
     unassignedNote: f => `Sources not in any favourite (grouped by name rules until added in Odoo): ${f}.`,
-    donorNote: d => `New donor = first Won order in Odoo. Odoo history starts ${d}, so early months overstate new donors.`,
+    donorNote: n => `New donor = first-ever received donation (Odoo Won + Received, plus ${n} phones from the old customer data), matched by phone. Returning = donated before the period. Counts are unique people. rCAC uses WhatsApp spend from the Daily tab.`,
     newDonors: 'New donors', retDonors: 'Returning donors', shareOfDonors: p => `${p} of donors`,
-    ncacNote: 'Paid + Organic spend per new donor', rcacNote: 'WhatsApp & CRM spend per returning donor',
+    ncacNote: 'Paid + Organic spend per new donor', rcacNote: 'WhatsApp messages spend per returning donor',
     charts: 'Trends and cohorts', cGroupCpk: 'Cost per kg by source group (7-day rolling)', cCumKg: 'Cumulative kg vs target', cCityKg: 'kg by city vs target',
-    cDonors: 'New vs returning donors by month', cCohort: 'Repeat donation by first-donation month', kgActual: 'Actual kg', kgTarget: 'Target kg',
+    cDonors: 'New vs returning donors by month', cCohort: 'Repeat donation by first-donation month (share of each cohort donating again)', kgActual: 'Actual kg', kgTarget: 'Target kg',
     cohortMonth: 'First donation', cohortSize: 'Donors',
     platform: 'Platform', crmLeads: 'CRM leads', platConv: 'Platform-reported', city: 'City',
     reconTxt: (a, b) => `Ad platforms report ${a} spend for this period; the Daily tab records ${b} as paid spend.`,
@@ -74,9 +74,9 @@ const T = {
     waPaidNote: 'عملاء Meta من مصدر "whatsapp paid" في Odoo منذ ٢٢ سبتمبر ٢٠٢٦؛ وما قبل ذلك ضمن واتساب.',
     favNote: f => `مجموعات المصادر تتبع المفضلة في Odoo: ${f}.`,
     unassignedNote: f => `مصادر غير مدرجة في أي مفضلة (تُصنف بالاسم حتى تُضاف في Odoo): ${f}.`,
-    donorNote: d => `المتبرع الجديد = أول طلب ناجح في Odoo. سجل Odoo يبدأ ${d}، لذا الأشهر الأولى تبالغ في الجدد.`,
+    donorNote: n => `المتبرع الجديد = أول تبرع مستلم على الإطلاق (Odoo ناجح ومستلم، إضافة إلى ${n} رقماً من بيانات العملاء القديمة) مطابقةً برقم الجوال. العائد = تبرع قبل الفترة. الأعداد أشخاص فريدون. rCAC يستخدم إنفاق واتساب من التبويب اليومي.`,
     newDonors: 'متبرعون جدد', retDonors: 'متبرعون عائدون', shareOfDonors: p => `${p} من المتبرعين`,
-    ncacNote: 'إنفاق المدفوع والعضوي لكل متبرع جديد', rcacNote: 'إنفاق واتساب وإعادة التفعيل لكل متبرع عائد',
+    ncacNote: 'إنفاق المدفوع والعضوي لكل متبرع جديد', rcacNote: 'إنفاق رسائل واتساب لكل متبرع عائد',
     charts: 'الاتجاهات والمجموعات', cGroupCpk: 'تكلفة الكيلو حسب مجموعة المصدر (متوسط ٧ أيام)', cCumKg: 'الكيلو التراكمي مقابل المستهدف', cCityKg: 'الكيلو حسب المدينة مقابل المستهدف',
     cDonors: 'المتبرعون الجدد والعائدون شهرياً', cCohort: 'تكرار التبرع حسب شهر أول تبرع', kgActual: 'الكيلو الفعلي', kgTarget: 'الكيلو المستهدف',
     cohortMonth: 'أول تبرع', cohortSize: 'المتبرعون',
@@ -313,7 +313,8 @@ function renderPerf() {
     t('overheadNote'), t('brandingNote'), t('waPaidNote'),
     ...(src.odoo.favourites && src.odoo.favourites.length ? [t('favNote')(src.odoo.favourites.join(', '))] : []),
     ...(src.odoo.unassigned && src.odoo.unassigned.length ? [t('unassignedNote')(src.odoo.unassigned.join(', '))] : []),
-    ...(dataset && dataset.donors && dataset.donors.historyFrom ? [t('donorNote')(dataset.donors.historyFrom)] : []),
+    t('donorNote')(fmtN((dataset && dataset.donors && dataset.donors.historyPhones) || 0)),
+    ...(dataset && dataset.donors && dataset.donors.note ? [dataset.donors.note] : []),
     ...(perf.notes || []), ...((src.ads.errors) || []),
   ];
   const tabs = Object.entries(src.sheets.tabs || {}).map(([k, v]) => `${k}: “${(v.daily || '-').trim()}” / “${(v.forecast || '-').trim()}”`);
@@ -358,25 +359,38 @@ function renderCharts(s) {
     { label: t('kgTarget'), data: cs.map(c => c.weightT), backgroundColor: 'rgba(237,167,55,.55)', borderRadius: 4 }] },
     options: { indexAxis: 'y', scales: { x: { reverse: rtl, ticks: { callback: v => fmtN(v / 1000) + 'k' }, grid: { color: 'rgba(29,74,79,.08)' } }, y: { position: rtl ? 'right' : 'left', grid: { display: false } } } } });
 
-  // 4) new vs returning donors by month (all history, independent of the date filter)
-  const byM = new Map();
-  for (const [d, , , isNew, n] of ((dataset && dataset.donors && dataset.donors.rows) || [])) {
-    const m = d.slice(0, 7); const x = byM.get(m) || [0, 0]; x[isNew ? 0 : 1] += n; byM.set(m, x);
-  }
+  // 4) new vs returning donors by month (unique phones; all months, independent of the date filter)
+  const D = (dataset && dataset.donors) || {};
+  const rows = D.rows || [];
+  const b0 = D.base ? Date.parse(D.base + 'T00:00:00Z') : 0;
+  const mOf = d => new Date(b0 + d * 864e5).toISOString().slice(0, 7);
+  const byM = new Map();                        // month -> Map(pid -> firstDay)
+  for (const [d, pid, fd] of rows) { const m = mOf(d); const x = byM.get(m) || new Map(); if (!x.has(pid)) x.set(pid, fd); byM.set(m, x); }
   const ms = [...byM.keys()].sort();
+  const split = m => { let n = 0, r = 0; const start = Math.round((Date.parse(m + '-01T00:00:00Z') - b0) / 864e5); for (const fd of byM.get(m).values()) fd >= start ? n++ : r++; return [n, r]; };
+  const sp = ms.map(split);
   mkChart('cDonors', { type: 'bar', data: { labels: ms, datasets: [
-    { label: t('newDonors'), data: ms.map(m => byM.get(m)[0]), backgroundColor: '#0ca39d', borderRadius: 3, stack: 'a' },
-    { label: t('retDonors'), data: ms.map(m => byM.get(m)[1]), backgroundColor: '#1d4a4f', borderRadius: 3, stack: 'a' }] },
+    { label: t('newDonors'), data: sp.map(x => x[0]), backgroundColor: '#0ca39d', borderRadius: 3, stack: 'a' },
+    { label: t('retDonors'), data: sp.map(x => x[1]), backgroundColor: '#1d4a4f', borderRadius: 3, stack: 'a' }] },
     options: { scales: { x: { ...xs, stacked: true }, y: { ...ys(v => fmtN(v)), stacked: true } } } });
 
-  // 5) cohort table: share of each first-donation month's donors who donated again in later months
-  const co = (dataset && dataset.donors && dataset.donors.cohorts) || [];
-  const maxOff = Math.max(0, ...co.map(r => r.length - 2));
+  // 5) cohorts: donors whose first-ever donation was in month M, and how many donated again in M+1, M+2...
+  const cohort = new Map();                     // first month -> Set(pid)
+  const active = new Map();                     // month -> Set(pid)
+  for (const [d, pid, fd] of rows) {
+    if (fd >= 0) { const fm = mOf(fd); (cohort.get(fm) || cohort.set(fm, new Set()).get(fm)).add(pid); }
+    const m = mOf(d); (active.get(m) || active.set(m, new Set()).get(m)).add(pid);
+  }
+  const cms = [...cohort.keys()].sort();
+  const addM = (m, k) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1)).toISOString().slice(0, 7);
+  const last = ms[ms.length - 1] || '';
+  const maxOff = cms.length ? Math.max(0, ...cms.map(m => { let k = 0; while (addM(m, k + 1) <= last) k++; return k; })) : 0;
   const cell = v => { const a = Math.min(1, v * 3); return `background:rgba(12,163,157,${(0.08 + a * 0.8).toFixed(2)});color:${a > .55 ? '#fff' : 'inherit'}`; };
-  $('#cohortTbl').innerHTML = `<thead><tr><th>${t('cohortMonth')}</th><th>${t('cohortSize')}</th>${Array.from({ length: Math.max(0, maxOff - 0) }, (_, i) => `<th>+${i + 1}</th>`).join('')}</tr></thead><tbody>` +
-    co.map(r => `<tr><td>${esc(r[0])}</td><td>${num(fmtN(r[1]))}</td>${Array.from({ length: maxOff }, (_, i) => {
-      const v = r[3 + i]; if (v == null) return '<td></td>';
-      const pct = r[1] ? v / r[1] : 0; return `<td style="${cell(pct)};text-align:center">${num(fmtN(pct * 100, 1) + '%')}</td>`; }).join('')}</tr>`).join('') + '</tbody>';
+  $('#cohortTbl').innerHTML = `<thead><tr><th>${t('cohortMonth')}</th><th>${t('cohortSize')}</th>${Array.from({ length: maxOff }, (_, i) => `<th>+${i + 1}</th>`).join('')}</tr></thead><tbody>` +
+    cms.map(m => { const set = cohort.get(m); return `<tr><td>${esc(m)}</td><td>${num(fmtN(set.size))}</td>${Array.from({ length: maxOff }, (_, i) => {
+      const mm = addM(m, i + 1); if (mm > last) return '<td></td>';
+      const act = active.get(mm); let c = 0; if (act) for (const p of set) if (act.has(p)) c++;
+      const pct = set.size ? c / set.size : 0; return `<td style="${cell(pct)}">${num(fmtN(pct * 100, 1) + '%')}</td>`; }).join('')}</tr>`; }).join('') + '</tbody>';
 }
 
 // ---------------- map ----------------

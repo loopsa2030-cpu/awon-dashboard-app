@@ -162,16 +162,20 @@
         cpl: div(spend, x.crmLeads), cac: div(spend, x.pickups), cpk: div(spend, x.weight) };
     });
 
-    // New vs returning donors (first Won order ever = new)
-    const donors = { newN: 0, retN: 0, newKg: 0, retKg: 0 };
-    for (const [d, , , isNew, n, kg] of ((ds.donors && ds.donors.rows) || [])) {
-      if (d < from || d > to) continue;
-      if (isNew) { donors.newN += n; donors.newKg += kg; } else { donors.retN += n; donors.retKg += kg; }
+    // New vs returning donors by phone: new = first-ever received donation falls in the period;
+    // returning = donated in the period and had donated before it. Unique people, not orders.
+    const donors = { newN: 0, retN: 0 };
+    if (ds.donors && ds.donors.rows && ds.donors.base) {
+      const b0 = Date.parse(ds.donors.base + 'T00:00:00Z');
+      const f = Math.round((Date.parse(from + 'T00:00:00Z') - b0) / 864e5), t = Math.round((Date.parse(to + 'T00:00:00Z') - b0) / 864e5);
+      const seen = new Map();
+      for (const [d, pid, fd] of ds.donors.rows) if (d >= f && d <= t && !seen.has(pid)) seen.set(pid, fd);
+      for (const fd of seen.values()) { if (fd >= f) donors.newN++; else donors.retN++; }
     }
 
     finish(total); GROUPS.forEach(g => finish(groups[g]));
     donors.nCAC = div(groups.paid.spend + groups.organic.spend, donors.newN);
-    donors.rCAC = div(groups.wa.spend, donors.retN);
+    donors.rCAC = div(groups.wa.spend, donors.retN);      // WhatsApp messages spend (WA "Spent" in the Daily tab)
     donors.newShare = div(donors.newN, donors.newN + donors.retN);
     for (const [d, byCity] of Object.entries(dayCityKg)) {
       const s = series[d]; if (!s) continue;
