@@ -11,8 +11,8 @@ const T = {
     all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', custom: 'Pick dates…',
     northStar: 'North star: cost per kg collected', perKg: 'per kg',
     marketing: 'Marketing', logistics: 'Logistics', vsTarget: 'Actual against the forecast, prorated to the last reported day',
-    logiNote: 'Fridays are non-operating days in the target', platforms: 'Paid platforms',
-    platNote: 'Spend from Supermetrics; leads, pickups and kg from Odoo landing-page sources',
+    logiNote: 'Fridays are non-operating days in the target', platforms: 'Source groups',
+    platNote: 'Group totals from the Daily tab; platform spend from Supermetrics; platform leads, pickups and kg from Odoo sources',
     cities: 'Cities', trend: 'Daily trend', orders: 'Orders', pickups: 'Pickups', kg: 'Weight (kg)',
     allCities: 'All cities', otherCities: 'Other cities', low: 'Low', high: 'High', topLoc: 'Top districts',
     spend: 'Spend', leads: 'Leads', cpl: 'Cost per lead', cac: 'Cost per pickup', weight: 'Weight collected',
@@ -22,10 +22,23 @@ const T = {
     cpkLine: (a, t, p) => `Target to date is <b>${t}</b>. That is ${p}.`,
     over: p => `${p} over target`, under: p => `${p} under target`,
     groupMeta: (s, kg) => `${s} spent · ${kg} kg`,
+    sourceGroup: 'Source group', waMsgs: 'WhatsApp conversations', platConvShort: 'platform leads', brandingCamp: 'branding campaigns',
+    metaNote: 'CRM leads = Odoo source "whatsapp paid" (live from 22 Sep; earlier Meta WhatsApp leads sit under WhatsApp)',
+    brandingTxt: a => `${a} of ad spend on non lead-gen campaigns is reported as branding under Organic.`,
+    brandingNote: 'Paid spend counts lead-gen campaigns only (website leads and WhatsApp). Awareness, traffic and video campaigns are reported as branding under Organic.',
+    waPaidNote: 'Meta leads use the Odoo source "whatsapp paid" from 22 Sep 2026; Meta WhatsApp leads before that date are counted under WhatsApp.',
+    favNote: f => `Source groups follow the Odoo favourites: ${f}.`,
+    unassignedNote: f => `Sources not in any favourite (grouped by name rules until added in Odoo): ${f}.`,
+    donorNote: d => `New donor = first Won order in Odoo. Odoo history starts ${d}, so early months overstate new donors.`,
+    newDonors: 'New donors', retDonors: 'Returning donors', shareOfDonors: p => `${p} of donors`,
+    ncacNote: 'Paid + Organic spend per new donor', rcacNote: 'WhatsApp & CRM spend per returning donor',
+    charts: 'Trends and cohorts', cGroupCpk: 'Cost per kg by source group (7-day rolling)', cCumKg: 'Cumulative kg vs target', cCityKg: 'kg by city vs target',
+    cDonors: 'New vs returning donors by month', cCohort: 'Repeat donation by first-donation month', kgActual: 'Actual kg', kgTarget: 'Target kg',
+    cohortMonth: 'First donation', cohortSize: 'Donors',
     platform: 'Platform', crmLeads: 'CRM leads', platConv: 'Platform-reported', city: 'City',
     reconTxt: (a, b) => `Ad platforms report ${a} spend for this period; the Daily tab records ${b} as paid spend.`,
     lowAttr: 'few CRM leads tagged to this platform',
-    updated: 'Updated', live: 'Live', snapshot: 'Partial', from: 'From', to: 'To',
+    updated: 'Updated', live: 'Live', snapshot: 'Partial', total: 'Total', totalAll: 'All districts', from: 'From', to: 'To',
     daysMode: 'Days', weeksMode: 'Weeks', monthsMode: 'Months', apply: 'Apply', pickStart: 'Pick a start and end day',
     nodata: 'No data for this period yet.', districts: 'Districts', totalOrders: 'Orders', totalKg: 'kg collected',
     district: 'District', approx: 'approx. location', unplaced: n => `${n} orders have no district on file and are not on the map.`,
@@ -43,8 +56,8 @@ const T = {
     all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', custom: 'اختيار التواريخ…',
     northStar: 'المؤشر الأساسي: تكلفة الكيلوغرام المجمّع', perKg: 'لكل كغ',
     marketing: 'التسويق', logistics: 'اللوجستيات', vsTarget: 'الفعلي مقابل المستهدف حتى آخر يوم مُسجّل',
-    logiNote: 'أيام الجمعة غير تشغيلية في المستهدف', platforms: 'المنصات الإعلانية',
-    platNote: 'الإنفاق من Supermetrics، والعملاء والاستلامات والأوزان من مصادر صفحات الهبوط في Odoo',
+    logiNote: 'أيام الجمعة غير تشغيلية في المستهدف', platforms: 'مجموعات المصادر',
+    platNote: 'إجماليات المجموعات من التبويب اليومي، وإنفاق المنصات من Supermetrics، وعملاء المنصات من مصادر Odoo',
     cities: 'المدن', trend: 'الاتجاه اليومي', orders: 'الطلبات', pickups: 'الاستلامات', kg: 'الوزن (كغ)',
     allCities: 'كل المدن', otherCities: 'مدن أخرى', low: 'منخفض', high: 'مرتفع', topLoc: 'أعلى الأحياء',
     spend: 'الإنفاق', leads: 'العملاء المحتملون', cpl: 'تكلفة العميل', cac: 'تكلفة الاستلام', weight: 'الوزن المجمّع',
@@ -54,10 +67,23 @@ const T = {
     cpkLine: (a, t, p) => `المستهدف حتى الآن <b>${t}</b>، أي ${p}.`,
     over: p => `أعلى من المستهدف بـ ${p}`, under: p => `أقل من المستهدف بـ ${p}`,
     groupMeta: (s, kg) => `إنفاق ${s} · ${kg} كغ`,
+    sourceGroup: 'مجموعة المصدر', waMsgs: 'محادثات واتساب', platConvShort: 'عملاء المنصة', brandingCamp: 'حملات العلامة',
+    metaNote: 'عملاء CRM = مصدر "whatsapp paid" في Odoo (يعمل من ٢٢ سبتمبر؛ ما قبله ضمن واتساب)',
+    brandingTxt: a => `${a} من الإنفاق الإعلاني على حملات غير موجهة لجلب العملاء يُحتسب كعلامة ضمن العضوي.`,
+    brandingNote: 'الإنفاق المدفوع يشمل حملات جلب العملاء فقط (الموقع وواتساب). حملات الوعي والزيارات والفيديو تُحتسب كعلامة ضمن العضوي.',
+    waPaidNote: 'عملاء Meta من مصدر "whatsapp paid" في Odoo منذ ٢٢ سبتمبر ٢٠٢٦؛ وما قبل ذلك ضمن واتساب.',
+    favNote: f => `مجموعات المصادر تتبع المفضلة في Odoo: ${f}.`,
+    unassignedNote: f => `مصادر غير مدرجة في أي مفضلة (تُصنف بالاسم حتى تُضاف في Odoo): ${f}.`,
+    donorNote: d => `المتبرع الجديد = أول طلب ناجح في Odoo. سجل Odoo يبدأ ${d}، لذا الأشهر الأولى تبالغ في الجدد.`,
+    newDonors: 'متبرعون جدد', retDonors: 'متبرعون عائدون', shareOfDonors: p => `${p} من المتبرعين`,
+    ncacNote: 'إنفاق المدفوع والعضوي لكل متبرع جديد', rcacNote: 'إنفاق واتساب وإعادة التفعيل لكل متبرع عائد',
+    charts: 'الاتجاهات والمجموعات', cGroupCpk: 'تكلفة الكيلو حسب مجموعة المصدر (متوسط ٧ أيام)', cCumKg: 'الكيلو التراكمي مقابل المستهدف', cCityKg: 'الكيلو حسب المدينة مقابل المستهدف',
+    cDonors: 'المتبرعون الجدد والعائدون شهرياً', cCohort: 'تكرار التبرع حسب شهر أول تبرع', kgActual: 'الكيلو الفعلي', kgTarget: 'الكيلو المستهدف',
+    cohortMonth: 'أول تبرع', cohortSize: 'المتبرعون',
     platform: 'المنصة', crmLeads: 'عملاء CRM', platConv: 'تحويلات المنصة', city: 'المدينة',
     reconTxt: (a, b) => `تُظهر المنصات إنفاق ${a} لهذه الفترة، بينما يسجل التبويب اليومي ${b} كإنفاق مدفوع.`,
     lowAttr: 'عدد قليل من العملاء مرتبط بهذه المنصة',
-    updated: 'آخر تحديث', live: 'مباشر', snapshot: 'جزئي', from: 'من', to: 'إلى',
+    updated: 'آخر تحديث', live: 'مباشر', snapshot: 'جزئي', total: 'الإجمالي', totalAll: 'كل الأحياء', from: 'من', to: 'إلى',
     daysMode: 'أيام', weeksMode: 'أسابيع', monthsMode: 'أشهر', apply: 'تطبيق', pickStart: 'اختر يوم البداية والنهاية',
     nodata: 'لا توجد بيانات لهذه الفترة بعد.', districts: 'الأحياء', totalOrders: 'الطلبات', totalKg: 'كغ مجمّعة',
     district: 'الحي', approx: 'موقع تقريبي', unplaced: n => `${n} طلب بلا حي مسجل ولا تظهر على الخريطة.`,
@@ -182,6 +208,10 @@ function kpi(label, val, tgtVal, fmt, kind) {
     <div class="t"><span>${esc(t('target'))} ${num(fmt(g))}</span><span class="d ${st}">${num(dtxt)}</span></div></div>`;
 }
 
+function kpiPlain(label, value, note) {
+  return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(value)}</div><div class="t"><span>${esc(note)}</span></div></div>`;
+}
+
 function renderPerf() {
   if (!perf) return;
   const T0 = perf.totals, G = perf.groups;
@@ -203,6 +233,10 @@ function renderPerf() {
     kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume'),
     kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost'),
     ...['paid', 'organic', 'wa'].map(g => kpi(`${t(g)}: ${t('leads')}`, G[g].leads, G[g].leadsT, v => fmtN(v), 'volume')),
+    kpiPlain(t('newDonors'), fmtN(perf.donors.newN), t('shareOfDonors')(fmtP(perf.donors.newShare))),
+    kpiPlain('nCAC', fmtC(perf.donors.nCAC), t('ncacNote')),
+    kpiPlain(t('retDonors'), fmtN(perf.donors.retN), t('shareOfDonors')(fmtP(perf.donors.newShare == null ? null : 1 - perf.donors.newShare))),
+    kpiPlain('rCAC', fmtC(perf.donors.rCAC), t('rcacNote')),
   ].join('');
   $('#kpiLog').innerHTML = [
     kpi(t('pickups'), T0.pickups, T0.pickupsT, v => fmtN(v), 'volume'),
@@ -212,20 +246,24 @@ function renderPerf() {
     kpi(t('cac'), T0.cac, T0.cacT, fmtC, 'cost'),
   ].join('');
 
-  // platforms
-  const rows = perf.platforms;
-  $('#platTbl').innerHTML = `<thead><tr><th>${t('platform')}</th><th>${t('spend')}</th><th>${t('crmLeads')}</th><th>${t('cpl')}</th><th>${t('pickups')}</th><th>kg</th><th>${t('cpk')}</th><th>${t('platConv')}</th></tr></thead><tbody>` +
-    rows.map(r => {
-      const low = r.spend > 500 && r.crmLeads < r.spend / 100;
-      return `<tr><td><span class="plat"><i style="background:${PLAT[r.platform][1]}"></i>${PLAT[r.platform][0]}</span>${low ? `<span class="flag">${esc(t('lowAttr'))}</span>` : ''}</td>
-      <td>${num(fmtUSD(r.spend))}</td><td>${num(fmtN(r.crmLeads))}</td><td>${num(fmtC(r.cpl))}</td><td>${num(fmtN(r.pickups))}</td>
-      <td>${num(fmtN(r.weight))}</td><td class="cpk-cell ${status(r.cpk, G.paid.cpkT, 'cost')}">${num(fmtC(r.cpk))}</td><td>${num(fmtN(r.platformLeads))}</td></tr>`;
-    }).join('') + '</tbody>' + (() => {
-      const t = perf.platforms.reduce((a, r) => ({ spend: a.spend + r.spend, crmLeads: a.crmLeads + r.crmLeads, pickups: a.pickups + r.pickups, weight: a.weight + r.weight, platformLeads: a.platformLeads + r.platformLeads }), { spend: 0, crmLeads: 0, pickups: 0, weight: 0, platformLeads: 0 });
-      return `<tfoot><tr><td>${esc(t18('total'))}</td><td>${num(fmtUSD(t.spend))}</td><td>${num(fmtN(t.crmLeads))}</td><td>${num(fmtC(t.crmLeads ? t.spend / t.crmLeads : null))}</td><td>${num(fmtN(t.pickups))}</td><td>${num(fmtN(t.weight))}</td><td>${num(fmtC(t.weight ? t.spend / t.weight : null))}</td><td>${num(fmtN(t.platformLeads))}</td></tr></tfoot>`;
-    })();
+  // source groups, with paid platforms and branding campaigns as sub-rows
+  const head = `<thead><tr><th>${t('sourceGroup')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('cpl')}</th><th>${t('pickups')}</th><th>kg</th><th>${t('cpk')}</th><th>${t('platConv')}</th></tr></thead>`;
+  const grow = (g) => { const x = G[g];
+    return `<tr class="grp"><td>${esc(t(g))}</td><td>${num(fmtUSD(x.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(x.spendT))}</span></td><td>${num(fmtN(x.leads))}</td><td>${num(fmtC(x.cpl))}</td>
+      <td>${num(fmtN(x.pickups))}</td><td>${num(fmtN(x.weight))}</td><td class="cpk-cell ${status(x.cpk, x.cpkT, 'cost')}">${num(fmtC(x.cpk))}<span class="sub">${num(fmtC(x.cpkT))}</span></td><td></td></tr>`; };
+  const prow = (r) => {
+    const low = r.spend > 500 && r.crmLeads < r.spend / 100;
+    const conv = r.platform === 'meta' ? t('waMsgs') : t('platConvShort');
+    return `<tr class="sub-row"><td><span class="plat"><i style="background:${PLAT[r.platform][1]}"></i>${PLAT[r.platform][0]}</span>${r.platform === 'meta' ? `<span class="flag">${esc(t('metaNote'))}</span>` : low ? `<span class="flag">${esc(t('lowAttr'))}</span>` : ''}</td>
+      <td>${num(fmtUSD(r.spend))}</td><td>${num(fmtN(r.crmLeads))}</td><td>${num(fmtC(r.cpl))}</td><td>${num(fmtN(r.pickups))}</td><td>${num(fmtN(r.weight))}</td>
+      <td class="cpk-cell ${status(r.cpk, G.paid.cpkT, 'cost')}">${num(fmtC(r.cpk))}</td><td>${num(fmtN(r.platformLeads))}<span class="sub">${esc(conv)}</span></td></tr>`; };
+  const brow = (b) => `<tr class="sub-row"><td><span class="plat"><i style="background:${PLAT[b.platform][1]};opacity:.5"></i>${PLAT[b.platform][0]} · ${esc(t('brandingCamp'))}</span></td><td>${num(fmtUSD(b.spend))}</td><td colspan="6"></td></tr>`;
+  $('#platTbl').innerHTML = head + '<tbody>' + grow('paid') + perf.platforms.map(prow).join('') +
+    grow('organic') + perf.branding.map(brow).join('') + grow('wa') + '</tbody>' +
+    `<tfoot><tr><td>${esc(t('total'))}</td><td>${num(fmtUSD(T0.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(T0.spendT))}</span></td><td>${num(fmtN(T0.leads))}</td><td>${num(fmtC(T0.cpl))}</td><td>${num(fmtN(T0.pickups))}</td><td>${num(fmtN(T0.weight))}</td>
+      <td class="cpk-cell ${status(T0.cpk, T0.cpkT, 'cost')}">${num(fmtC(T0.cpk))}<span class="sub">${num(fmtC(T0.cpkT))}</span></td><td></td></tr></tfoot>`;
   const rc = perf.reconciliation;
-  $('#recon').textContent = t('reconTxt')(fmtUSD(rc.adPlatformsSpend), fmtUSD(rc.sheetPaidSpend));
+  $('#recon').textContent = t('reconTxt')(fmtUSD(rc.adPlatformsSpend), fmtUSD(rc.sheetPaidSpend)) + ' ' + t('brandingTxt')(fmtUSD(perf.brandingMoved));
 
   // cities
   const maxKg = Math.max(1, ...perf.cities.map(c => c.weightT || c.weight));
@@ -263,6 +301,7 @@ function renderPerf() {
   };
   if (chart) chart.destroy();
   if (window.Chart) chart = new Chart($('#trend'), cfg);
+  renderCharts(s);
 
   // notes / sources
   const src = perf.sources;
@@ -271,10 +310,73 @@ function renderPerf() {
     t('srcLine')(t('srcSheets'), src.sheets.mode === 'live' ? t('live') : t('snapshot'), src.sheets.mode === 'live' ? when(src.sheets.mtdModified) : when(src.sheets.snapshotAt)),
     t('srcLine')(t('srcOdoo'), src.odoo.mode === 'live' ? t('live') : t('snapshot'), src.odoo.mode === 'live' ? '' : when(src.odoo.snapshotAt)),
     t('srcLine')(t('srcAds'), src.ads.mode === 'live' ? t('live') : t('snapshot'), src.ads.coverage ? `${src.ads.coverage.from} → ${src.ads.coverage.to}` : ''),
-    t('overheadNote'), ...(perf.notes || []), ...((src.ads.errors) || []),
+    t('overheadNote'), t('brandingNote'), t('waPaidNote'),
+    ...(src.odoo.favourites && src.odoo.favourites.length ? [t('favNote')(src.odoo.favourites.join(', '))] : []),
+    ...(src.odoo.unassigned && src.odoo.unassigned.length ? [t('unassignedNote')(src.odoo.unassigned.join(', '))] : []),
+    ...(dataset && dataset.donors && dataset.donors.historyFrom ? [t('donorNote')(dataset.donors.historyFrom)] : []),
+    ...(perf.notes || []), ...((src.ads.errors) || []),
   ];
   const tabs = Object.entries(src.sheets.tabs || {}).map(([k, v]) => `${k}: “${(v.daily || '-').trim()}” / “${(v.forecast || '-').trim()}”`);
   $('#notes').innerHTML = lines.map(l => `<li>${esc(l)}</li>`).join('') + (tabs.length ? `<li>${esc(tabs.join(' · '))}</li>` : '');
+}
+
+// ---------------- extra charts ----------------
+const charts = {};
+const GCOL = { paid: '#b54e37', organic: '#0ca39d', wa: '#1d4a4f' };
+function mkChart(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  if (!window.Chart || !$('#' + id)) return;
+  const base = { maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'IBM Plex Sans Arabic' } } } } };
+  cfg.options = Object.assign(base, cfg.options || {});
+  charts[id] = new Chart($('#' + id), cfg);
+}
+function weekKey(d) { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() - x.getUTCDay()); return x.toISOString().slice(0, 10); }
+function renderCharts(s) {
+  const rtl = lang === 'ar';
+  const xs = { reverse: rtl, grid: { display: false }, ticks: { maxTicksLimit: 12 } };
+  const ys = (cb) => ({ position: rtl ? 'right' : 'left', grid: { color: 'rgba(29,74,79,.08)' }, ticks: { callback: cb } });
+
+  // 1) cost per kg by source group (7-day rolling, so Fridays and quiet days don't spike the line)
+  const roll = (g, i) => { let sp = 0, kg = 0; for (let j = Math.max(0, i - 6); j <= i; j++) { sp += s[j]['sp_' + g] || 0; kg += s[j]['kg_' + g] || 0; } return kg > 50 ? sp / kg : null; };
+  mkChart('cGroupCpk', { type: 'line', data: { labels: s.map(d => d.date.slice(5)), datasets: ['paid', 'organic', 'wa'].map(g => ({
+    label: t(g), data: s.map((d, i) => roll(g, i)), borderColor: GCOL[g], backgroundColor: GCOL[g], pointRadius: s.length > 45 ? 0 : 2, borderWidth: 2, spanGaps: true, tension: .25 })) },
+    options: { scales: { x: xs, y: ys(v => '$' + fmtN(v, 2)) } } });
+
+  // 2) cumulative kg vs cumulative target
+  let ca = 0, ct = 0;
+  const cum = s.map(d => { ca += d.weight; ct += d.weightT; return { d: d.date, a: ca, t: ct }; });
+  mkChart('cCumKg', { type: 'line', data: { labels: cum.map(c => c.d.slice(5)), datasets: [
+    { label: t('kgActual'), data: cum.map(c => c.a), borderColor: '#0ca39d', backgroundColor: 'rgba(12,163,157,.12)', fill: true, pointRadius: 0, borderWidth: 2.5 },
+    { label: t('kgTarget'), data: cum.map(c => c.t), borderColor: '#eda737', borderDash: [6, 4], pointRadius: 0, borderWidth: 2 }] },
+    options: { scales: { x: xs, y: ys(v => fmtN(v / 1000) + 'k') } } });
+
+  // 3) kg by city, actual vs target
+  const cs = perf.cities;
+  mkChart('cCityKg', { type: 'bar', data: { labels: cs.map(c => c.label[lang]), datasets: [
+    { label: t('kgActual'), data: cs.map(c => c.weight), backgroundColor: '#0ca39d', borderRadius: 4 },
+    { label: t('kgTarget'), data: cs.map(c => c.weightT), backgroundColor: 'rgba(237,167,55,.55)', borderRadius: 4 }] },
+    options: { indexAxis: 'y', scales: { x: { reverse: rtl, ticks: { callback: v => fmtN(v / 1000) + 'k' }, grid: { color: 'rgba(29,74,79,.08)' } }, y: { position: rtl ? 'right' : 'left', grid: { display: false } } } } });
+
+  // 4) new vs returning donors by month (all history, independent of the date filter)
+  const byM = new Map();
+  for (const [d, , , isNew, n] of ((dataset && dataset.donors && dataset.donors.rows) || [])) {
+    const m = d.slice(0, 7); const x = byM.get(m) || [0, 0]; x[isNew ? 0 : 1] += n; byM.set(m, x);
+  }
+  const ms = [...byM.keys()].sort();
+  mkChart('cDonors', { type: 'bar', data: { labels: ms, datasets: [
+    { label: t('newDonors'), data: ms.map(m => byM.get(m)[0]), backgroundColor: '#0ca39d', borderRadius: 3, stack: 'a' },
+    { label: t('retDonors'), data: ms.map(m => byM.get(m)[1]), backgroundColor: '#1d4a4f', borderRadius: 3, stack: 'a' }] },
+    options: { scales: { x: { ...xs, stacked: true }, y: { ...ys(v => fmtN(v)), stacked: true } } } });
+
+  // 5) cohort table: share of each first-donation month's donors who donated again in later months
+  const co = (dataset && dataset.donors && dataset.donors.cohorts) || [];
+  const maxOff = Math.max(0, ...co.map(r => r.length - 2));
+  const cell = v => { const a = Math.min(1, v * 3); return `background:rgba(12,163,157,${(0.08 + a * 0.8).toFixed(2)});color:${a > .55 ? '#fff' : 'inherit'}`; };
+  $('#cohortTbl').innerHTML = `<thead><tr><th>${t('cohortMonth')}</th><th>${t('cohortSize')}</th>${Array.from({ length: Math.max(0, maxOff - 0) }, (_, i) => `<th>+${i + 1}</th>`).join('')}</tr></thead><tbody>` +
+    co.map(r => `<tr><td>${esc(r[0])}</td><td>${num(fmtN(r[1]))}</td>${Array.from({ length: maxOff }, (_, i) => {
+      const v = r[3 + i]; if (v == null) return '<td></td>';
+      const pct = r[1] ? v / r[1] : 0; return `<td style="${cell(pct)};text-align:center">${num(fmtN(pct * 100, 1) + '%')}</td>`; }).join('')}</tr>`).join('') + '</tbody>';
 }
 
 // ---------------- map ----------------

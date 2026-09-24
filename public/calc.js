@@ -74,18 +74,33 @@
     const cityOf = c => cities[c] || (cities[c] = { city: c, ...blank(), g: Object.fromEntries(GROUPS.map(g => [g, { leads: 0, spend: 0, leadsT: 0, spendT: 0 }])) });
     const day = d => series[d] || (series[d] = { date: d, spend: 0, leads: 0, pickups: 0, weight: 0, spendT: 0, weightT: 0 });
     let usedOdoo = false;
-    for (const r of rows) {
+    const dayCityKg = {};
+    // Paid budget counts only lead-gen campaigns; branding campaigns move to Organic (national share per day).
+    const adDay = {};
+    let lgSum = 0, brSum = 0;
+    for (const p of PLATS) for (const [d, lg, br] of (ds.ads.platforms[p] || [])) {
+      if (d < from || d > to) continue;
+      const a = adDay[d] || (adDay[d] = [0, 0]); a[0] += lg; a[1] += br; lgSum += lg; brSum += br;
+    }
+    const brShare = d => { const a = adDay[d]; return a && a[0] + a[1] > 0 ? a[1] / (a[0] + a[1]) : (lgSum + brSum > 0 ? brSum / (lgSum + brSum) : 0); };
+    let brandingMoved = 0;
+    for (let r of rows) {
       const [date, city] = r;
       const c = cityOf(city), s = day(date);
+      const shift = r[3] * brShare(date);
+      brandingMoved += shift;
+      r = [...r]; r[3] -= shift; r[5] += shift;
       GROUPS.forEach((g, i) => {
         const leads = r[2 + i * 2], spend = r[3 + i * 2];
         c.g[g].leads += leads; c.g[g].spend += spend;
         groups[g].leads += leads; groups[g].spend += spend;
         c.leads += leads; c.spend += spend; s.leads += leads; s.spend += spend;
+        s['sp_' + g] = (s['sp_' + g] || 0) + spend;
       });
       let pk = r[8], kg = r[9];
       if (!logisticsMonths.has(date.slice(0, 7))) { const l = oLog[date + '|' + city]; pk = l ? l.pickups : 0; kg = l ? l.kg : 0; usedOdoo = true; }
       c.pickups += pk; c.weight += kg; s.pickups += pk; s.weight += kg;
+      (dayCityKg[date] = dayCityKg[date] || {})[city] = ((dayCityKg[date] || {})[city] || 0) + kg;
     }
     if (usedOdoo) notes.push('Pickups/kg for months without logistics columns in the Daily tab come from Odoo (Won orders).');
 
@@ -136,16 +151,35 @@
       .sort((a, b) => b.spend - a.spend);
 
     let adsTotal = 0;
+    const branding = [];
     const platforms = PLATS.map(p => {
-      let spend = 0, platformLeads = 0;
-      for (const [d, sp, pl] of (ds.ads.platforms[p] || [])) if (d >= from && d <= to) { spend += sp; platformLeads += pl; }
+      let spend = 0, br = 0, platformLeads = 0;
+      for (const [d, lg, b, pl] of (ds.ads.platforms[p] || [])) if (d >= from && d <= to) { spend += lg; br += b; platformLeads += pl; }
       adsTotal += spend;
+      if (br > 0) branding.push({ platform: p, spend: br });
       const x = plat[p];
       return { platform: p, spend, platformLeads, crmLeads: x.crmLeads, pickups: x.pickups, weight: x.weight,
         cpl: div(spend, x.crmLeads), cac: div(spend, x.pickups), cpk: div(spend, x.weight) };
     });
 
+    // New vs returning donors (first Won order ever = new)
+    const donors = { newN: 0, retN: 0, newKg: 0, retKg: 0 };
+    for (const [d, , , isNew, n, kg] of ((ds.donors && ds.donors.rows) || [])) {
+      if (d < from || d > to) continue;
+      if (isNew) { donors.newN += n; donors.newKg += kg; } else { donors.retN += n; donors.retKg += kg; }
+    }
+
     finish(total); GROUPS.forEach(g => finish(groups[g]));
+    donors.nCAC = div(groups.paid.spend + groups.organic.spend, donors.newN);
+    donors.rCAC = div(groups.wa.spend, donors.retN);
+    donors.newShare = div(donors.newN, donors.newN + donors.retN);
+    for (const [d, byCity] of Object.entries(dayCityKg)) {
+      const s = series[d]; if (!s) continue;
+      for (const [city, kg] of Object.entries(byCity)) {
+        const kgS = oKg[city]; const kgT = kgS ? GROUPS.reduce((a, g) => a + kgS[g], 0) : 0;
+        for (const g of GROUPS) s['kg_' + g] = (s['kg_' + g] || 0) + (kgT ? kg * kgS[g] / kgT : 0);
+      }
+    }
     const seriesList = Object.values(series).sort((a, b) => a.date.localeCompare(b.date));
     const tabs = {};
     for (const [k, m] of Object.entries(ds.months)) if (k >= from.slice(0, 7) && k <= to.slice(0, 7)) tabs[k] = { daily: m.dailyTab, forecast: m.forecastTab };
@@ -153,7 +187,7 @@
     return {
       range: { from, to, lastReported, targetEnd, firstAvailable: first },
       sources: { sheets: { ...ds.sources.sheets, tabs }, odoo: ds.sources.odoo, ads: ds.sources.ads },
-      totals: total, groups, cities: cityList, platforms, overheadT,
+      totals: total, groups, cities: cityList, platforms, branding, brandingMoved, donors, overheadT,
       reconciliation: { sheetPaidSpend: groups.paid.spend, adPlatformsSpend: adsTotal },
       series: seriesList, notes, generatedAt: ds.generatedAt,
     };

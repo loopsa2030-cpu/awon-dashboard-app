@@ -65,7 +65,7 @@
     </section>
 
     <section>
-      <div class="sec-h"><h2 data-i18n="platforms">Paid platforms</h2><p data-i18n="platNote">Spend from Supermetrics; leads, pickups and kg from Odoo landing-page sources</p></div>
+      <div class="sec-h"><h2 data-i18n="platforms">Source groups</h2><p data-i18n="platNote"></p></div>
       <div class="panel"><div class="tbl-wrap"><table id="platTbl"></table></div><div class="recon" id="recon"></div></div>
     </section>
 
@@ -80,6 +80,16 @@
           <div class="panel chart-box"><canvas id="trend"></canvas></div>
         </div>
       </div>
+    </section>
+    <section>
+      <div class="sec-h"><h2 data-i18n="charts">Trends and cohorts</h2></div>
+      <div class="grid2">
+        <div class="panel chart-box"><h3 class="ch" data-i18n="cGroupCpk"></h3><div class="cw"><canvas id="cGroupCpk"></canvas></div></div>
+        <div class="panel chart-box"><h3 class="ch" data-i18n="cCumKg"></h3><div class="cw"><canvas id="cCumKg"></canvas></div></div>
+        <div class="panel chart-box"><h3 class="ch" data-i18n="cCityKg"></h3><div class="cw"><canvas id="cCityKg"></canvas></div></div>
+        <div class="panel chart-box"><h3 class="ch" data-i18n="cDonors"></h3><div class="cw"><canvas id="cDonors"></canvas></div></div>
+      </div>
+      <div class="panel" style="margin-top:18px"><h3 class="ch" style="padding:16px 18px 0" data-i18n="cCohort"></h3><div class="tbl-wrap"><table id="cohortTbl" class="cohort"></table></div></div>
     </section>
     <div id="perfErr"></div>
     <ul class="notes" id="notes"></ul>

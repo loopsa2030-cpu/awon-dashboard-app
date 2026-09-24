@@ -163,3 +163,13 @@ td .sub{display:block;font-size:11.5px;color:var(--muted)}
   .map-stats{grid-template-columns:1fr 1fr}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.chart-box .ch,.ch{font:500 14.5px var(--display);color:var(--petrol);margin:0 0 8px}
+.chart-box .cw{position:relative;height:calc(100% - 28px)}
+tr.grp td{font-weight:600;background:#f7fcfb;border-top:1px solid var(--line)}
+tr.grp td:first-child{color:var(--petrol)}
+tr.sub-row td:first-child{padding-inline-start:30px}
+table.cohort td,table.cohort th{text-align:center}
+table.cohort td:first-child,table.cohort th:first-child{text-align:start}
+@media (max-width:960px){.grid2{grid-template-columns:1fr}}
