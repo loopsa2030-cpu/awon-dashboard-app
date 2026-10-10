@@ -131,6 +131,27 @@
       }
     }
 
+    // Full-month targets for every month the range touches (shown under the prorated target).
+    const monthT = blank(), monthG = Object.fromEntries(GROUPS.map(g => [g, { spendT: 0, leadsT: 0 }]));
+    const monthKeys = [];
+    for (let mk = from.slice(0, 7); mk <= to.slice(0, 7); mk = addDays(mk + '-28', 7).slice(0, 7)) {
+      const f = ds.months[mk] && ds.months[mk].forecast;
+      if (!f) continue;
+      monthKeys.push(mk);
+      for (const fc of f.cities) {
+        monthT.spendT += fc.overhead || 0; monthT.pickupsT += fc.pickups; monthT.weightT += fc.weight;
+        const bud = GROUPS.reduce((a, g) => a + fc[g].budget, 0);
+        for (const g of GROUPS) {
+          monthT.spendT += fc[g].budget; monthT.leadsT += fc[g].leads;
+          monthG[g].leadsT += fc[g].leads; monthG[g].spendT += fc[g].budget + (bud ? (fc.overhead || 0) * fc[g].budget / bud : 0);
+        }
+      }
+    }
+    const mt = { spend: monthT.spendT, leads: monthT.leadsT, pickups: monthT.pickupsT, weight: monthT.weightT };
+    mt.cpl = div(mt.spend, mt.leads); mt.cac = div(mt.spend, mt.pickups); mt.cpk = div(mt.spend, mt.weight);
+    mt.pickupRate = div(mt.pickups, mt.leads); mt.kgPerPickup = div(mt.weight, mt.pickups);
+    mt.months = monthKeys; mt.groups = monthG;
+
     let estimated = false;
     for (const c of Object.values(cities)) {
       const kgS = oKg[c.city], wonS = oWon[c.city];
@@ -192,7 +213,7 @@
     return {
       range: { from, to, lastReported, targetEnd, firstAvailable: first },
       sources: { sheets: { ...ds.sources.sheets, tabs }, odoo: ds.sources.odoo, ads: ds.sources.ads },
-      totals: total, groups, cities: cityList, platforms, branding, brandingMoved, donors, overheadT,
+      totals: total, monthTargets: mt, groups, cities: cityList, platforms, branding, brandingMoved, donors, overheadT,
       reconciliation: { sheetPaidSpend: groups.paid.spend, adPlatformsSpend: adsTotal },
       series: seriesList, notes, generatedAt: ds.generatedAt,
     };

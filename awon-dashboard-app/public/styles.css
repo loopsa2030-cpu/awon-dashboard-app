@@ -211,3 +211,22 @@ table.cohort td:first-child,table.cohort th:first-child{text-align:start}
 .trend-cw{position:relative;height:360px}
 .trend-note{margin:8px 2px 0;color:var(--muted);font-size:12.5px}
 @media (max-width:760px){.trend-cw{height:300px}}
+
+/* ---------- headline card variants: teal (weight), soft (spend), petrol (CPK) ---------- */
+.hl.teal{background:linear-gradient(135deg,#0ca39d 0%,#0a8f8a 100%);color:#fff;border-color:#0ca39d;position:relative;overflow:hidden}
+.hl.teal .k{color:rgba(255,255,255,.85)}
+.hl.teal .t{color:rgba(255,255,255,.85)} .hl.teal .t b{color:#fff}
+.hl.teal .bar{background:rgba(255,255,255,.25)}
+.hl.teal .bar i.good{background:#e9fdfb}
+.hl.teal .dchip.good{background:rgba(233,253,251,.25);color:#fff}
+.hl.teal .dchip.warn{background:rgba(237,167,55,.35);color:#fff3dc}
+.hl.teal .dchip.bad{background:rgba(181,78,55,.45);color:#fff}
+.hl.soft{background:linear-gradient(135deg,#fffaf0 0%,#fdf1da 100%);border-color:rgba(237,167,55,.35);position:relative;overflow:hidden}
+.hl.teal>*:not(.art),.hl.soft>*:not(.art){position:relative;z-index:1}
+.hl .art.mark{position:absolute;inset-inline-end:-30px;top:-20px;bottom:-20px;width:46%;background:url(brand/mark-light.svg) no-repeat center/contain;opacity:.18}
+.hl .art.lattice{position:absolute;inset:0;inset-inline-start:45%;background:url(brand/lattice.svg) repeat;background-size:90px 90px;opacity:.16;-webkit-mask-image:linear-gradient(90deg,transparent,#000 70%);mask-image:linear-gradient(90deg,transparent,#000 70%)}
+[dir=rtl] .hl .art.lattice{-webkit-mask-image:linear-gradient(270deg,transparent,#000 70%);mask-image:linear-gradient(270deg,transparent,#000 70%)}
+[dir=rtl] .hl .art.mark{transform:scaleX(-1)}
+.hl .t.mt{padding-top:6px;border-top:1px dashed rgba(29,74,79,.18);margin-top:2px}
+.hl.teal .t.mt,.hl.main .t.mt{border-top-color:rgba(233,253,251,.3)}
+.kpi .t.mt{margin-top:4px;padding-top:6px;border-top:1px dashed var(--line)}

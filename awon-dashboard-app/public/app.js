@@ -6,7 +6,7 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 // ---------------- i18n ----------------
 const T = {
   en: {
-    hlWeight: 'Total weight collected', hlSpend: 'Total spend', hlCpk: 'Cost per kg', toDate: 'Target to date',
+    hlWeight: 'Total weight collected', hlSpend: 'Total spend', hlCpk: 'Cost per kg', toDate: 'Target to date', monthTgt: m => `${m} target`, periodTgt: (a, b) => `Full target ${a} to ${b}`,
     hlPace: p => `${p} of target`,
     leadsT: 'Leads target', pickupsT: 'Pickups target', rateT: 'Pickup rate target', kgpT: 'kg per pickup target',
     ratesNote: 'Pickup rate = pickups ÷ leads on the same day. Fridays (no pickups) are left blank.',
@@ -63,7 +63,7 @@ const T = {
     series: { spend: 'Spend', target: 'Spend target', kg: 'kg', cpk: 'CPK (7-day rolling)' },
   },
   ar: {
-    hlWeight: 'إجمالي الوزن المجمّع', hlSpend: 'إجمالي الإنفاق', hlCpk: 'تكلفة الكيلو', toDate: 'المستهدف حتى الآن',
+    hlWeight: 'إجمالي الوزن المجمّع', hlSpend: 'إجمالي الإنفاق', hlCpk: 'تكلفة الكيلو', toDate: 'المستهدف حتى الآن', monthTgt: m => `مستهدف ${m}`, periodTgt: (a, b) => `المستهدف الكامل ${a} إلى ${b}`,
     hlPace: p => `${p} من المستهدف`,
     leadsT: 'مستهدف العملاء', pickupsT: 'مستهدف الاستلامات', rateT: 'مستهدف نسبة الاستلام', kgpT: 'مستهدف الكيلو لكل استلام',
     ratesNote: 'نسبة الاستلام = الاستلامات ÷ العملاء في اليوم نفسه. أيام الجمعة (بلا استلامات) تُترك فارغة.',
@@ -131,6 +131,12 @@ const fmtN = (v, d = 0) => v == null || !isFinite(v) ? '-' : new Intl.NumberForm
 const fmtUSD = (v, d) => v == null || !isFinite(v) ? '-' : '$' + fmtN(v, d ?? (Math.abs(v) < 10 ? 2 : 0));
 const fmtC = v => v == null || !isFinite(v) ? '-' : '$' + fmtN(v, v < 1 ? 3 : 2);
 const fmtP = v => v == null || !isFinite(v) ? '-' : fmtN(v * 100, 1) + '%';
+function mtLabel() {
+  const ms = (perf && perf.monthTargets && perf.monthTargets.months) || [];
+  if (!ms.length) return '';
+  const name = m => new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-US', { month: 'long', timeZone: 'UTC', ...(ms.length > 1 ? { year: 'numeric' } : {}) }).format(new Date(m + '-01T00:00:00Z'));
+  return ms.length === 1 ? t('monthTgt')(name(ms[0])) : t('periodTgt')(name(ms[0]), name(ms[ms.length - 1]));
+}
 const num = s => `<span class="num">${s}</span>`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -221,15 +227,16 @@ function renderFresh() {
   $('#freshTxt').textContent = `${allLive ? t('live') : t('snapshot')} · ${t('updated')} ${tm}`;
 }
 
-function kpi(label, val, tgtVal, fmt, kind) {
+function kpi(label, val, tgtVal, fmt, kind, mtv) {
   const a = val, g = tgtVal;
   const st = status(a, g, kind);
   const pct = g ? Math.max(0, Math.min(100, (a / g) * 100)) : 0;
   const diff = g ? (a / g - 1) : null;
-  const dtxt = diff == null ? '' : `${diff >= 0 ? '+' : '−'}${fmtN(Math.abs(diff) * 100, 0)}%`;
+  const dtxt = diff == null ? '' : Math.round(Math.abs(diff) * 100) === 0 ? '0%' : `${diff >= 0 ? '+' : '−'}${fmtN(Math.abs(diff) * 100, 0)}%`;
   return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(fmt(a))}</div>
     <div class="bar"><i class="${st}" style="width:${pct}%"></i></div>
-    <div class="t"><span>${esc(t('target'))} ${num(fmt(g))}</span><span class="d ${st}">${num(dtxt)}</span></div></div>`;
+    <div class="t"><span>${esc(t('target'))} ${num(fmt(g))}</span><span class="d ${st}">${num(dtxt)}</span></div>
+    ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} ${num(fmt(mtv))}</span></div>` : ''}</div>`;
 }
 
 function kpiPlain(label, value, note) {
@@ -240,20 +247,23 @@ function renderPerf() {
   if (!perf) return;
   const T0 = perf.totals, G = perf.groups;
   // headline: total weight, spend and CPK against the prorated target
-  const hl = (label, val, tg, fmt, kind, main, unit) => {
+  const MT = perf.monthTargets || {};
+  const hl = (label, val, tg, fmt, kind, main, unit, mtv) => {
     const st = status(val, tg, kind);
     const r = tg ? val / tg : null;
     const pct = r == null ? 0 : Math.max(0, Math.min(100, r * 100));
-    const d = r == null ? '' : `${r - 1 >= 0 ? '+' : '−'}${fmtN(Math.abs(r - 1) * 100, 0)}%`;
-    return `<div class="hl${main ? ' main' : ''}">${main ? '<div class="art" aria-hidden="true"><img src="brand/hands.svg" alt=""></div>' : ''}<div class="k"><span>${esc(label)}</span>${d ? `<span class="dchip ${st}">${num(d)}</span>` : ''}</div>
+    const d = r == null ? '' : Math.round(Math.abs(r - 1) * 100) === 0 ? '0%' : `${r - 1 >= 0 ? '+' : '−'}${fmtN(Math.abs(r - 1) * 100, 0)}%`;
+    const art = { main: '<div class="art" aria-hidden="true"><img src="brand/hands.svg" alt=""></div>', teal: '<div class="art mark" aria-hidden="true"></div>', soft: '<div class="art lattice" aria-hidden="true"></div>' }[main] || '';
+    return `<div class="hl ${main}">${art}<div class="k"><span>${esc(label)}</span>${d ? `<span class="dchip ${st}">${num(d)}</span>` : ''}</div>
       <div class="v">${num(fmt(val))}${unit ? `<small>${esc(unit)}</small>` : ''}</div>
       <div class="bar"><i class="${st}" style="width:${pct}%"></i></div>
-      <div class="t"><span>${esc(t('toDate'))} <b>${num(fmt(tg))}</b></span>${kind !== 'cost' && r != null ? `<span>${t('hlPace')(num(fmtN(r * 100, 0) + '%'))}</span>` : ''}</div></div>`;
+      <div class="t"><span>${esc(t('toDate'))} <b>${num(fmt(tg))}</b></span>${kind !== 'cost' && r != null ? `<span>${t('hlPace')(num(fmtN(r * 100, 0) + '%'))}</span>` : ''}</div>
+      ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} <b>${num(fmt(mtv))}</b></span>${kind !== 'cost' && mtv ? `<span>${t('hlPace')(num(fmtN(val / mtv * 100, 0) + '%'))}</span>` : ''}</div>` : ''}</div>`;
   };
   $('#headline').innerHTML = [
-    hl(t('hlWeight'), T0.weight, T0.weightT, v => fmtN(v), 'volume', false, lang === 'ar' ? 'كغ' : 'kg'),
-    hl(t('hlSpend'), T0.spend, T0.spendT, v => fmtUSD(v, 0), 'pace', false),
-    hl(t('hlCpk'), T0.cpk, T0.cpkT, fmtC, 'cost', true, t('perKg')),
+    hl(t('hlWeight'), T0.weight, T0.weightT, v => fmtN(v), 'volume', 'teal', lang === 'ar' ? 'كغ' : 'kg', MT.weight),
+    hl(t('hlSpend'), T0.spend, T0.spendT, v => fmtUSD(v, 0), 'pace', 'soft', '', MT.spend),
+    hl(t('hlCpk'), T0.cpk, T0.cpkT, fmtC, 'cost', 'main', t('perKg'), MT.cpk),
   ].join('');
   // north star sentence under the group cards
   const diff = T0.cpkT ? T0.cpk / T0.cpkT - 1 : null;
@@ -265,21 +275,21 @@ function renderPerf() {
       <div class="v"><span class="num cpk-cell ${s}">${fmtC(x.cpk)}</span><span class="t">${esc(t('target'))} ${num(fmtC(x.cpkT))}</span></div></div>`;
   }).join('');
   $('#kpiMkt').innerHTML = [
-    kpi(t('spend'), T0.spend, T0.spendT, fmtUSD, 'pace'),
-    kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume'),
-    kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost'),
-    ...['paid', 'organic', 'wa'].map(g => kpi(`${t(g)}: ${t('leads')}`, G[g].leads, G[g].leadsT, v => fmtN(v), 'volume')),
+    kpi(t('spend'), T0.spend, T0.spendT, fmtUSD, 'pace', MT.spend),
+    kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume', MT.leads),
+    kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost', MT.cpl),
+    ...['paid', 'organic', 'wa'].map(g => kpi(`${t(g)}: ${t('leads')}`, G[g].leads, G[g].leadsT, v => fmtN(v), 'volume', MT.groups && MT.groups[g].leadsT)),
     kpiPlain(t('newDonors'), fmtN(perf.donors.newN), t('shareOfDonors')(fmtP(perf.donors.newShare))),
     kpiPlain('nCAC', fmtC(perf.donors.nCAC), t('ncacNote')),
     kpiPlain(t('retDonors'), fmtN(perf.donors.retN), t('shareOfDonors')(fmtP(perf.donors.newShare == null ? null : 1 - perf.donors.newShare))),
     kpiPlain('rCAC', fmtC(perf.donors.rCAC), t('rcacNote')),
   ].join('');
   $('#kpiLog').innerHTML = [
-    kpi(t('pickups'), T0.pickups, T0.pickupsT, v => fmtN(v), 'volume'),
-    kpi(t('weight'), T0.weight, T0.weightT, v => fmtN(v) + (lang === 'ar' ? ' كغ' : ' kg'), 'volume'),
-    kpi(t('pickupRate'), T0.pickupRate, T0.pickupRateT, fmtP, 'volume'),
-    kpi(t('kgPerPickup'), T0.kgPerPickup, T0.kgPerPickupT, v => fmtN(v, 1), 'volume'),
-    kpi(t('cac'), T0.cac, T0.cacT, fmtC, 'cost'),
+    kpi(t('pickups'), T0.pickups, T0.pickupsT, v => fmtN(v), 'volume', MT.pickups),
+    kpi(t('weight'), T0.weight, T0.weightT, v => fmtN(v) + (lang === 'ar' ? ' كغ' : ' kg'), 'volume', MT.weight),
+    kpi(t('pickupRate'), T0.pickupRate, T0.pickupRateT, fmtP, 'volume', MT.pickupRate),
+    kpi(t('kgPerPickup'), T0.kgPerPickup, T0.kgPerPickupT, v => fmtN(v, 1), 'volume', MT.kgPerPickup),
+    kpi(t('cac'), T0.cac, T0.cacT, fmtC, 'cost', MT.cac),
   ].join('');
 
   // source groups, with paid platforms and branding campaigns as sub-rows
