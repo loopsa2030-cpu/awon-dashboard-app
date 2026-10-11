@@ -231,3 +231,10 @@ table.cohort td:first-child,table.cohort th:first-child{text-align:start}
 .hl.teal .t.mt,.hl.main .t.mt{border-top-color:rgba(233,253,251,.3)}
 .kpi .t.mt{margin-top:4px;padding-top:6px;border-top:1px dashed var(--line)}
 .sg .v .lbl{display:block;font:500 11.5px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:-2px}
+/* city kg achievement column */
+td.ach{min-width:150px}
+.achrow{display:flex;align-items:center;gap:10px;justify-content:flex-end}
+.achrow .minibar{width:90px;height:7px;margin:0}
+.minibar i.good{background:var(--teal)} .minibar i.warn{background:var(--gold)} .minibar i.bad{background:var(--brick)}
+.achrow b{font:600 14px var(--display);min-width:44px;text-align:end}
+.achrow b.good{color:#0a7f7a} .achrow b.warn{color:#a8700f} .achrow b.bad{color:var(--brick)}

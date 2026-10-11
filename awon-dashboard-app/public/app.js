@@ -29,7 +29,7 @@ const T = {
     paid: 'Paid ads', organic: 'Organic & branding', wa: 'WhatsApp & CRM',
     cpkLine: (a, t, p) => `Target to date is <b>${t}</b>. That is ${p}.`,
     over: p => `${p} over target`, under: p => `${p} under target`,
-    groupMeta: (s, kg) => `${s} spent · ${kg} kg`, cpkLbl: 'CPK', cpkTgtLbl: 'target CPK',
+    groupMeta: (s, kg) => `${s} spent · ${kg} kg`, cpkLbl: 'CPK', kgAch: 'kg achieved vs target', cpkTgtLbl: 'target CPK',
     donationsRec: 'Donations received', kgPerDonation: 'kg/donation',
     locNote: (n, p) => `Locations come from real order coordinates in the customer data (${n} districts located). ${p} of donations are placed at their district; the rest sit near their city centre (dashed amber).`,
     locLoading: 'District locations are loading from the customer data; pins sit near city centres until then.',
@@ -86,7 +86,7 @@ const T = {
     paid: 'الإعلانات المدفوعة', organic: 'العضوي والعلامة', wa: 'واتساب وإعادة التفعيل',
     cpkLine: (a, t, p) => `المستهدف حتى الآن <b>${t}</b>، أي ${p}.`,
     over: p => `أعلى من المستهدف بـ ${p}`, under: p => `أقل من المستهدف بـ ${p}`,
-    groupMeta: (s, kg) => `إنفاق ${s} · ${kg} كغ`, cpkLbl: 'تكلفة الكيلو', cpkTgtLbl: 'المستهدف',
+    groupMeta: (s, kg) => `إنفاق ${s} · ${kg} كغ`, cpkLbl: 'تكلفة الكيلو', kgAch: 'نسبة الإنجاز (الأوزان)', cpkTgtLbl: 'المستهدف',
     donationsRec: 'التبرعات المستلمة', kgPerDonation: 'كغ/تبرع',
     locNote: (n, p) => `المواقع مأخوذة من إحداثيات الطلبات الفعلية في بيانات العملاء (${n} حياً). ${p} من التبرعات في موقع حيّها، والباقي قرب مركز المدينة (بإطار متقطع).`,
     locLoading: 'جارٍ تحميل مواقع الأحياء من بيانات العملاء؛ الدبابيس قرب مراكز المدن حتى ذلك.',
@@ -294,19 +294,21 @@ function renderPerf() {
   ].join('');
 
   // cities
-  const maxKg = Math.max(1, ...perf.cities.map(c => c.weightT || c.weight));
-  $('#cityTbl').innerHTML = `<thead><tr><th>${t('city')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('pickups')}</th><th>kg</th><th>${t('cpk')}</th></tr></thead><tbody>` +
+  // kg achievement vs the prorated kg target, per city
+  const ach = (a, tg) => { if (!tg) return '<td></td>'; const r = a / tg, st = status(a, tg, 'volume');
+    return `<td class="ach"><div class="achrow"><span class="minibar"><i class="${st}" style="width:${Math.min(100, r * 100)}%"></i></span><b class="num ${st}">${fmtN(r * 100, 0)}%</b></div></td>`; };
+  $('#cityTbl').innerHTML = `<thead><tr><th>${t('city')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('pickups')}</th><th>kg</th><th>${t('kgAch')}</th><th>${t('cpk')}</th></tr></thead><tbody>` +
     perf.cities.map(c => `<tr><td>${esc(c.label[lang])}</td>
       <td>${num(fmtUSD(c.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(c.spendT))}</span></td>
       <td>${num(fmtN(c.leads))}<span class="sub">${num(fmtN(c.leadsT))}</span></td>
       <td>${num(fmtN(c.pickups))}<span class="sub">${num(fmtN(c.pickupsT))}</span></td>
-      <td>${num(fmtN(c.weight))}<span class="minibar"><i style="width:${Math.min(100, c.weight / maxKg * 100)}%"></i></span><span class="sub">${num(fmtN(c.weightT))}</span></td>
+      <td>${num(fmtN(c.weight))}<span class="sub">${num(fmtN(c.weightT))}</span></td>${ach(c.weight, c.weightT)}
       <td class="cpk-cell ${status(c.cpk, c.cpkT, 'cost')}">${num(fmtC(c.cpk))}<span class="sub">${num(fmtC(c.cpkT))}</span></td></tr>`).join('') + '</tbody>' +
     `<tfoot><tr><td>${esc(t18('total'))}</td>
       <td>${num(fmtUSD(T0.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(T0.spendT))}</span></td>
       <td>${num(fmtN(T0.leads))}<span class="sub">${num(fmtN(T0.leadsT))}</span></td>
       <td>${num(fmtN(T0.pickups))}<span class="sub">${num(fmtN(T0.pickupsT))}</span></td>
-      <td>${num(fmtN(T0.weight))}<span class="sub">${num(fmtN(T0.weightT))}</span></td>
+      <td>${num(fmtN(T0.weight))}<span class="sub">${num(fmtN(T0.weightT))}</span></td>${ach(T0.weight, T0.weightT)}
       <td class="cpk-cell ${status(T0.cpk, T0.cpkT, 'cost')}">${num(fmtC(T0.cpk))}<span class="sub">${num(fmtC(T0.cpkT))}</span></td></tr></tfoot>`;
 
   // chart
