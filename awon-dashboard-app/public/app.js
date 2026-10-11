@@ -29,7 +29,7 @@ const T = {
     paid: 'Paid ads', organic: 'Organic & branding', wa: 'WhatsApp & CRM',
     cpkLine: (a, t, p) => `Target to date is <b>${t}</b>. That is ${p}.`,
     over: p => `${p} over target`, under: p => `${p} under target`,
-    groupMeta: (s, kg) => `${s} spent · ${kg} kg`,
+    groupMeta: (s, kg) => `${s} spent · ${kg} kg`, cpkLbl: 'CPK', cpkTgtLbl: 'target CPK',
     donationsRec: 'Donations received', kgPerDonation: 'kg/donation',
     locNote: (n, p) => `Locations come from real order coordinates in the customer data (${n} districts located). ${p} of donations are placed at their district; the rest sit near their city centre (dashed amber).`,
     locLoading: 'District locations are loading from the customer data; pins sit near city centres until then.',
@@ -86,7 +86,7 @@ const T = {
     paid: 'الإعلانات المدفوعة', organic: 'العضوي والعلامة', wa: 'واتساب وإعادة التفعيل',
     cpkLine: (a, t, p) => `المستهدف حتى الآن <b>${t}</b>، أي ${p}.`,
     over: p => `أعلى من المستهدف بـ ${p}`, under: p => `أقل من المستهدف بـ ${p}`,
-    groupMeta: (s, kg) => `إنفاق ${s} · ${kg} كغ`,
+    groupMeta: (s, kg) => `إنفاق ${s} · ${kg} كغ`, cpkLbl: 'تكلفة الكيلو', cpkTgtLbl: 'المستهدف',
     donationsRec: 'التبرعات المستلمة', kgPerDonation: 'كغ/تبرع',
     locNote: (n, p) => `المواقع مأخوذة من إحداثيات الطلبات الفعلية في بيانات العملاء (${n} حياً). ${p} من التبرعات في موقع حيّها، والباقي قرب مركز المدينة (بإطار متقطع).`,
     locLoading: 'جارٍ تحميل مواقع الأحياء من بيانات العملاء؛ الدبابيس قرب مراكز المدن حتى ذلك.',
@@ -272,16 +272,17 @@ function renderPerf() {
   $('#groups').innerHTML = ['paid', 'organic', 'wa'].map(g => {
     const x = G[g]; const s = status(x.cpk, x.cpkT, 'cost');
     return `<div class="sg"><h3>${esc(t(g))}</h3><div class="meta">${esc(t('groupMeta')(fmtUSD(x.spend), fmtN(x.weight)))}</div>
-      <div class="v"><span class="num cpk-cell ${s}">${fmtC(x.cpk)}</span><span class="t">${esc(t('target'))} ${num(fmtC(x.cpkT))}</span></div></div>`;
+      <div class="v"><span class="lbl">${esc(t('cpkLbl'))}</span><span class="num cpk-cell ${s}">${fmtC(x.cpk)}</span><span class="t">${esc(t('cpkTgtLbl'))} ${num(fmtC(x.cpkT))}</span></div></div>`;
   }).join('');
+  const gl = g => kpi(`${t(g)}: ${t('leads')}`, G[g].leads, G[g].leadsT, v => fmtN(v), 'volume', MT.groups && MT.groups[g].leadsT);
   $('#kpiMkt').innerHTML = [
     kpi(t('spend'), T0.spend, T0.spendT, fmtUSD, 'pace', MT.spend),
     kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume', MT.leads),
-    kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost', MT.cpl),
-    ...['paid', 'organic', 'wa'].map(g => kpi(`${t(g)}: ${t('leads')}`, G[g].leads, G[g].leadsT, v => fmtN(v), 'volume', MT.groups && MT.groups[g].leadsT)),
     kpiPlain(t('newDonors'), fmtN(perf.donors.newN), t('shareOfDonors')(fmtP(perf.donors.newShare))),
-    kpiPlain('nCAC', fmtC(perf.donors.nCAC), t('ncacNote')),
     kpiPlain(t('retDonors'), fmtN(perf.donors.retN), t('shareOfDonors')(fmtP(perf.donors.newShare == null ? null : 1 - perf.donors.newShare))),
+    gl('paid'), gl('organic'), gl('wa'),
+    kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost', MT.cpl),
+    kpiPlain('nCAC', fmtC(perf.donors.nCAC), t('ncacNote')),
     kpiPlain('rCAC', fmtC(perf.donors.rCAC), t('rcacNote')),
   ].join('');
   $('#kpiLog').innerHTML = [
@@ -469,7 +470,7 @@ function renderCharts(s) {
     if (fd >= 0) { const fm = mOf(fd); (cohort.get(fm) || cohort.set(fm, new Set()).get(fm)).add(pid); }
     const m = mOf(d); (active.get(m) || active.set(m, new Set()).get(m)).add(pid);
   }
-  const cms = [...cohort.keys()].sort();
+  const cms = [...cohort.keys()].filter(m => m >= '2026-03').sort();   // Feb 2026 is the first data month: its 'first donations' include earlier donors, so it is left out
   const addM = (m, k) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1)).toISOString().slice(0, 7);
   const last = ms[ms.length - 1] || '';
   const maxOff = cms.length ? Math.max(0, ...cms.map(m => { let k = 0; while (addM(m, k + 1) <= last) k++; return k; })) : 0;
