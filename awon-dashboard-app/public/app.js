@@ -293,25 +293,6 @@ function renderPerf() {
     kpi(t('cac'), T0.cac, T0.cacT, fmtC, 'cost', MT.cac),
   ].join('');
 
-  // source groups, with paid platforms and branding campaigns as sub-rows
-  const head = `<thead><tr><th>${t('sourceGroup')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('cpl')}</th><th>${t('pickups')}</th><th>kg</th><th>${t('cpk')}</th><th>${t('platConv')}</th></tr></thead>`;
-  const grow = (g) => { const x = G[g];
-    return `<tr class="grp"><td>${esc(t(g))}</td><td>${num(fmtUSD(x.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(x.spendT))}</span></td><td>${num(fmtN(x.leads))}</td><td>${num(fmtC(x.cpl))}</td>
-      <td>${num(fmtN(x.pickups))}</td><td>${num(fmtN(x.weight))}</td><td class="cpk-cell ${status(x.cpk, x.cpkT, 'cost')}">${num(fmtC(x.cpk))}<span class="sub">${num(fmtC(x.cpkT))}</span></td><td></td></tr>`; };
-  const prow = (r) => {
-    const low = r.spend > 500 && r.crmLeads < r.spend / 100;
-    const conv = r.platform === 'meta' ? t('waMsgs') : t('platConvShort');
-    return `<tr class="sub-row"><td><span class="plat"><i style="background:${PLAT[r.platform][1]}"></i>${PLAT[r.platform][0]}</span>${r.platform === 'meta' ? `<span class="flag">${esc(t('metaNote'))}</span>` : low ? `<span class="flag">${esc(t('lowAttr'))}</span>` : ''}</td>
-      <td>${num(fmtUSD(r.spend))}</td><td>${num(fmtN(r.crmLeads))}</td><td>${num(fmtC(r.cpl))}</td><td>${num(fmtN(r.pickups))}</td><td>${num(fmtN(r.weight))}</td>
-      <td class="cpk-cell ${status(r.cpk, G.paid.cpkT, 'cost')}">${num(fmtC(r.cpk))}</td><td>${num(fmtN(r.platformLeads))}<span class="sub">${esc(conv)}</span></td></tr>`; };
-  const brow = (b) => `<tr class="sub-row"><td><span class="plat"><i style="background:${PLAT[b.platform][1]};opacity:.5"></i>${PLAT[b.platform][0]} · ${esc(t('brandingCamp'))}</span></td><td>${num(fmtUSD(b.spend))}</td><td colspan="6"></td></tr>`;
-  $('#platTbl').innerHTML = head + '<tbody>' + grow('paid') + perf.platforms.map(prow).join('') +
-    grow('organic') + perf.branding.map(brow).join('') + grow('wa') + '</tbody>' +
-    `<tfoot><tr><td>${esc(t('total'))}</td><td>${num(fmtUSD(T0.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(T0.spendT))}</span></td><td>${num(fmtN(T0.leads))}</td><td>${num(fmtC(T0.cpl))}</td><td>${num(fmtN(T0.pickups))}</td><td>${num(fmtN(T0.weight))}</td>
-      <td class="cpk-cell ${status(T0.cpk, T0.cpkT, 'cost')}">${num(fmtC(T0.cpk))}<span class="sub">${num(fmtC(T0.cpkT))}</span></td><td></td></tr></tfoot>`;
-  const rc = perf.reconciliation;
-  $('#recon').textContent = t('reconTxt')(fmtUSD(rc.adPlatformsSpend), fmtUSD(rc.sheetPaidSpend)) + ' ' + t('brandingTxt')(fmtUSD(perf.brandingMoved));
-
   // cities
   const maxKg = Math.max(1, ...perf.cities.map(c => c.weightT || c.weight));
   $('#cityTbl').innerHTML = `<thead><tr><th>${t('city')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('pickups')}</th><th>kg</th><th>${t('cpk')}</th></tr></thead><tbody>` +
