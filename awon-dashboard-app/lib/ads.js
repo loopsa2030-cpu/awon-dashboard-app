@@ -10,7 +10,8 @@ const PLATFORMS = {
               legacy: ['Date', 'AdvertisingChannelType', 'Cost', 'Conversions'],
               leadgen: /^(SEARCH|PERFORMANCE[ _]MAX|MULTI[ _]CHANNEL)$/i },
   snapchat: { ds: 'SCM', account: process.env.SM_SNAP_ACCOUNT || 'd73ea452-c58a-44e5-aa37-29e3205fcebe',
-              fields: ['date', 'campaign_name', 'campaign_objective', 'cost', 'conversion_sign_ups', 'swipes', 'campaign_id'], idx: [0, 1, 2, 3, 4, 5, 6],
+              // Supermetrics returns dimensions before metrics, so campaign_id must sit with the dimensions
+              fields: ['date', 'campaign_name', 'campaign_id', 'campaign_objective', 'cost', 'conversion_sign_ups', 'swipes'], idx: [0, 1, 3, 4, 5, 6, 2],
               legacy: ['date', 'campaign_objective', 'cost', 'conversion_sign_ups'],
               leadgen: /LEAD|CONVERSION|SALES/i },
   meta:     { ds: 'FA',  account: process.env.SM_META_ACCOUNT || 'act_1219983855612087',
@@ -78,11 +79,14 @@ async function queryPlatform(name, from, to) {
 
 // GA4 sessions: [date, kind('paid'|'organic'), platform, city|'', sessions]
 const PAID_CH = /^(paid|cross-network|display)/i;
+// Meta ads tagged with utm_source=fb/ig/an/th but no paid medium land in "Organic Social"; a real campaign name marks them as paid
+const AD_SRC = /^(fb|ig|an|th|wa|facebook|instagram|snapchat|tiktok)$/i;   // th = Threads, an = Audience Network, wa = WhatsApp placements (all Meta)
+const NOT_CAMP = /^\(|^$/;
 function gaPlatform(kind, source) {
   const s = String(source || '').toLowerCase();
   if (/snap/.test(s)) return 'snapchat';
-  if (/tiktok|^th$/.test(s)) return 'tiktok';
-  if (/facebook|instagram|^ig$|^fb$|^an$|meta|^m\.facebook|^l\.facebook|^lm\.facebook/.test(s)) return 'meta';
+  if (/tiktok/.test(s)) return 'tiktok';
+  if (/facebook|instagram|^ig$|^fb$|^an$|^th$|^wa$|meta|^m\.facebook|^l\.facebook|^lm\.facebook/.test(s)) return 'meta';
   if (/google|adwords|bing|yahoo|duckduckgo|ecosia/.test(s)) return kind === 'paid' ? 'google' : 'web';
   return kind === 'paid' ? 'other' : 'web';
 }
@@ -97,16 +101,22 @@ function gaChunks(from, to) {
   }
   return chunks;
 }
+const GA_DAYS = Number(process.env.GA4_DAYS || 120);
 async function gaRaw(from, to) {
-  const parts = await Promise.all(gaChunks(from, to).map(([s, e]) => smQuery('GAWA', [GA_PROPERTY],
-    ['date', 'sessionDefaultChannelGrouping', 'sessionSource', 'sessionCampaignName', 'sessions'], s, e)));
-  return parts.flat();
+  // Recent window only, one month at a time in sequence: parallel GA4 requests next to the ad platforms hit Supermetrics limits
+  const min = new Date(Date.parse(to + 'T00:00:00Z') - GA_DAYS * 864e5).toISOString().slice(0, 10);
+  const out = [];
+  for (const [s, e] of gaChunks(from > min ? from : min, to)) {
+    const rows = await smQuery('GAWA', [GA_PROPERTY], ['date', 'sessionDefaultChannelGrouping', 'sessionSource', 'sessionCampaignName', 'sessions'], s, e);
+    out.push(...rows);
+  }
+  return out;
 }
 function gaAggregate(raw, campaignNames) {
   const agg = new Map();
   for (const r of raw) {
     const date = String(r[0]).slice(0, 10), ch = String(r[1] || ''), src = r[2], camp = String(r[3] || '');
-    const kind = PAID_CH.test(ch) ? 'paid' : 'organic';
+    const kind = PAID_CH.test(ch) || (AD_SRC.test(String(src || '')) && !NOT_CAMP.test(camp)) ? 'paid' : 'organic';
     const plat = gaPlatform(kind, src);
     const city = kind === 'paid' ? (cityFromText(campaignNames[camp] || camp) || '') : '';
     const k = [date, kind, plat, city].join('|');
@@ -123,7 +133,7 @@ async function load(from, to) {
   const hit = cache.get(ck);
   if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.value;
   const errors = [];
-  const gaP = timeout(gaRaw(from, to), 40000, 'GA4').catch(e => { errors.push('GA4: ' + e.message); return []; });   // runs in parallel with the ad platforms
+  const gaP = timeout(gaRaw(from, to), 45000, 'GA4').catch(e => { errors.push('GA4: ' + e.message); return []; });   // runs in parallel with the ad platforms
   const entries = await Promise.all(Object.keys(PLATFORMS).map(async k => {
     try { const r = await queryPlatform(k, from, to); if (r.rows.fallback) errors.push(`${k}: campaign detail unavailable (${r.rows.fallback})`); return [k, r]; }
     catch (e) { errors.push(`${k}: ${e.message}`); return [k, { rows: [], ids: {} }]; }
