@@ -24,7 +24,8 @@ const T = {
     cohortNote: 'Weeks start on Sunday. Darker green = better than that source\'s average, darker red = worse.',
     notes: 'How these numbers work',
     n1: 'CRM leads come from Odoo sources; native leads are what each ad platform reports (Meta = WhatsApp conversations started).',
-    n2: 'Paid spend and native leads come from the ad platforms (lead-gen campaigns only). City comes from the campaign name; campaigns for all cities show as national.',
+    noAds: 'Ad platform data is not available right now, so paid spend per platform is split by CRM leads. Totals are exact; per-platform CPLs are estimates until ad data returns (see notes at the bottom).',
+    n2: 'Spend comes from the Daily sheet, same as Performance (the branding share of paid spend moves to Organic). Paid spend is split across platforms by each platform\'s lead-gen ad spend that day for that city (CRM lead mix when ad data is missing). Native leads and clicks come from the ad platforms; their city comes from the campaign name.',
     n3: 'Website visits are GA4 sessions. GA4 has no city data for this site, so paid visits get their city from the campaign name and organic visits have no city.',
     n4: 'Organic CPL: Meta, TikTok and Snapchat use the branding spend on that platform; website organic uses the organic budget from the Daily tab; partners and PR have no direct spend.',
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
@@ -71,7 +72,8 @@ const T = {
     cohortNote: 'الأسابيع تبدأ يوم الأحد. الأخضر الأغمق أفضل من متوسط المصدر، والأحمر الأغمق أسوأ.',
     notes: 'كيف تُحسب الأرقام',
     n1: 'عملاء CRM من مصادر Odoo؛ عملاء المنصة كما تعلنها كل منصة إعلانية (ميتا = محادثات واتساب).',
-    n2: 'الإنفاق المدفوع وعملاء المنصة من المنصات الإعلانية (حملات جلب العملاء فقط). المدينة من اسم الحملة؛ حملات كل المدن تظهر كوطني.',
+    noAds: 'بيانات المنصات الإعلانية غير متاحة حالياً، لذلك وُزع الإنفاق المدفوع على المنصات حسب عملاء CRM. الإجماليات دقيقة، وتكلفة العميل لكل منصة تقديرية حتى تعود بيانات الإعلانات (راجع الملاحظات أسفل الصفحة).',
+    n2: 'الإنفاق من الشيت اليومي كما في قسم الأداء (حصة الحملات التوعوية تنتقل إلى العضوي). يوزع الإنفاق المدفوع على المنصات حسب إنفاق كل منصة على حملات جلب العملاء في نفس اليوم والمدينة (أو حسب توزيع عملاء CRM عند غياب بيانات الإعلانات). عملاء المنصة والنقرات من المنصات الإعلانية، والمدينة من اسم الحملة.',
     n3: 'زيارات الموقع هي جلسات GA4. لا توجد بيانات مدن في GA4 لهذا الموقع، لذلك المدينة للزيارات المدفوعة من اسم الحملة والزيارات العضوية بلا مدينة.',
     n4: 'تكلفة العميل العضوي: ميتا وتيك توك وسناب تستخدم إنفاق العلامة على المنصة نفسها؛ الموقع يستخدم ميزانية العضوي من التبويب اليومي؛ الشركاء والعلاقات العامة بلا إنفاق مباشر.',
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
@@ -145,13 +147,24 @@ function aggregate(ds, from, to) {
   for (const p of ORG) A.org[p] = { leads: 0, visits: 0, spend: 0 };
   const day = d => A.days[d] || (A.days[d] = { paid: {}, org: {}, waSpend: 0, waCrm: 0, paidSpend: 0, paidCrm: 0, paidNative: 0, paidVisits: 0, orgLeads: 0, orgVisits: 0, orgSpend: 0, sheet: {} });
   const pc = (p, c) => { const k = p + '|' + c; return A.paidCity[k] || (A.paidCity[k] = { p, c, ...blankP() }); };
-  // ad platforms
+  // ad platforms: native leads, clicks and spend shares only (spend itself comes from the Daily sheet, as on Performance)
+  const adLg = {}, adBr = {}, perLg = { tot: 0, p: {} }, perBr = { tot: 0, p: {} };
+  const addSh = (o, p, v) => { o.tot += v; o.p[p] = (o.p[p] || 0) + v; };
   for (const p of PAID) for (const [d, c, lg, sp, nl, ck] of ((ds.ads && ds.ads.camps && ds.ads.camps[p]) || [])) {
     if (d < from || d > to) continue;
-    if (!lg) { A.paid[p].brand += sp; continue; }
-    const x = A.paid[p]; x.spend += sp; x.native += nl; x.clicks += ck;
-    const y = pc(p, c); y.spend += sp; y.native += nl; y.clicks += ck;
-    const D = day(d); D.paidSpend += sp; D.paidNative += nl; (D.paid[p] = D.paid[p] || blankP()).spend += sp; D.paid[p].native += nl;
+    if (!lg) { addSh(adBr[d] || (adBr[d] = { tot: 0, p: {} }), p, sp); addSh(perBr, p, sp); continue; }
+    const L = adLg[d] || (adLg[d] = { tot: 0, p: {}, city: {} });
+    addSh(L, p, sp); addSh(perLg, p, sp);
+    if (c) addSh(L.city[c] || (L.city[c] = { tot: 0, p: {} }), p, sp);
+    const x = A.paid[p]; x.native += nl; x.clicks += ck;
+    const y = pc(p, c); y.native += nl; y.clicks += ck;
+    const D = day(d); D.paidNative += nl; (D.paid[p] = D.paid[p] || blankP()).native += nl;
+  }
+  // fall back to the platform-level daily rows when campaign detail is missing
+  if (!perLg.tot && !perBr.tot) for (const p of PAID) for (const [d, lg, br] of ((ds.ads && ds.ads.platforms && ds.ads.platforms[p]) || [])) {
+    if (d < from || d > to) continue;
+    if (lg) { addSh(adLg[d] || (adLg[d] = { tot: 0, p: {}, city: {} }), p, lg); addSh(perLg, p, lg); }
+    if (br) { addSh(adBr[d] || (adBr[d] = { tot: 0, p: {} }), p, br); addSh(perBr, p, br); }
   }
   // GA4 sessions
   for (const [d, kind, plat, c, s] of ((ds.ads && ds.ads.ga) || [])) {
@@ -167,12 +180,14 @@ function aggregate(ds, from, to) {
     }
   }
   // Odoo CRM leads
+  const crmDay = {}, crmPer = { tot: 0, p: {} };
   for (const [d, c, g, plat, won, n, kg] of ((ds.odoo && ds.odoo.rows) || [])) {
     if (d < from || d > to) continue;
     const D = day(d);
     if (g === 'paid') {
       const p = PAID.includes(plat) ? plat : 'untagged';
       const x = A.paid[p]; x.crm += n; if (won) { x.won += n; x.kg += kg; }
+      if (p !== 'untagged') { addSh(crmDay[d] || (crmDay[d] = { tot: 0, p: {} }), p, n); addSh(crmPer, p, n); }
       const y = pc(p, c === 'unknown' ? '' : c); y.crm += n;
       D.paidCrm += n; (D.paid[p] = D.paid[p] || blankP()).crm += n;
     } else if (g === 'organic') {
@@ -182,21 +197,41 @@ function aggregate(ds, from, to) {
       A.wa.crm += n; D.waCrm += n; const w = A.waCity[c] || (A.waCity[c] = { crm: 0 }); w.crm += n;
     }
   }
-  // Daily tab (sheet): city-level group numbers + organic and WhatsApp spend
+  // Daily tab (sheet): spend for every group, as on Performance. Branding share of paid spend moves to Organic (same rule as Performance).
+  const brShare = d => { const x = adLg[d], y = adBr[d], l = x ? x.tot : 0, b = y ? y.tot : 0; return l + b > 0 ? b / (l + b) : (perLg.tot + perBr.tot > 0 ? perBr.tot / (perLg.tot + perBr.tot) : 0); };
+  const pick = (...o) => o.find(x => x && x.tot > 0);
+  A.alloc = perLg.tot > 0 ? 'ads' : 'crm';
+  let orgBrandWeb = 0;
   for (const m of Object.values(ds.months || {})) for (const r of (m.rows || [])) {
-    const [d, c, pl, ps, ol, os, wl, ws] = r;
+    const [d, c, pl, ps0, ol, os0, wl, ws] = r;
     if (d < from || d > to) continue;
+    const shift = ps0 * brShare(d), ps = ps0 - shift, os = os0 + shift;
+    const D = day(d);
+    // paid spend per platform: the city's own ad mix that day, else the day's national mix, else the period mix, else CRM lead mix
+    if (ps > 0) {
+      const L = adLg[d], sh = pick(L && L.city[c], L, perLg, crmDay[d], crmPer);
+      const parts = sh ? Object.entries(sh.p).map(([p, v]) => [p, v / sh.tot]) : [['untagged', 1]];
+      for (const [p, f] of parts) {
+        const v = ps * f;
+        A.paid[p].spend += v; pc(p, c).spend += v; D.paidSpend += v; (D.paid[p] = D.paid[p] || blankP()).spend += v;
+      }
+    }
+    // branding spend per platform (reported under Organic)
+    if (shift > 0) {
+      const sh = pick(adBr[d], perBr);
+      for (const [p, v] of Object.entries(sh.p)) { A.paid[p].brand += shift * v / sh.tot; if (!Object.values(ORG_BRAND).includes(p)) orgBrandWeb += shift * v / sh.tot; }
+    }
     const s = A.sheetCity[c] || (A.sheetCity[c] = { pl: 0, ps: 0, ol: 0, os: 0, wl: 0, ws: 0 });
     s.pl += pl; s.ps += ps; s.ol += ol; s.os += os; s.wl += wl; s.ws += ws;
-    A.orgSheetSpend += os; A.wa.spend += ws;
-    const D = day(d); D.waSpend += ws; D.orgSpend += os;
+    A.orgSheetSpend += os0; A.wa.spend += ws;
+    D.waSpend += ws; D.orgSpend += os;
     const sc = D.sheet[c] || (D.sheet[c] = { pl: 0, ps: 0, ol: 0, os: 0, wl: 0, ws: 0 });
     sc.pl += pl; sc.ps += ps; sc.ol += ol; sc.os += os; sc.wl += wl; sc.ws += ws;
     const w = A.waCity[c] || (A.waCity[c] = { crm: 0 }); w.spend = (w.spend || 0) + ws;
   }
-  // organic spend per platform
+  // organic spend per platform: branding of that platform; website gets the sheet's organic spend plus other branding
   for (const [op, bp] of Object.entries(ORG_BRAND)) A.org[op].spend = A.paid[bp].brand;
-  A.org.o_web.spend = A.orgSheetSpend;
+  A.org.o_web.spend = A.orgSheetSpend + orgBrandWeb;
   // totals
   const P = blankP();
   for (const p of [...PAID, 'untagged']) for (const k of Object.keys(P)) P[k] += A.paid[p][k];
@@ -329,9 +364,9 @@ function render({ ds, from, to, lang, perf }) {
   const fold = (src, dst) => { for (const x of Object.values(src)) { if (cityPlat !== 'all' && x.p !== cityPlat) continue; const o = dst[x.c] || (dst[x.c] = blankP()); for (const k of Object.keys(o)) o[k] += x[k] || 0; } };
   fold(C.paidCity, pcAgg); fold(P.paidCity, pcPrev);
   const pcRows = Object.entries(pcAgg).sort((a, b) => b[1].spend - a[1].spend || b[1].crm - a[1].crm).map(([c, x]) => {
-    const q = pcPrev[c] || blankP(); const cpl = div(x.spend, x.crm);
+    const q = pcPrev[c] || blankP(); const cpl = cplOf(x.spend, x.crm);
     return `<tr><td>${esc(cityName(c))}</td><td>${num(fU(x.spend))}${delta(x.spend, q.spend, 'neutral')}</td><td>${num(fN(x.crm))}${delta(x.crm, q.crm, 'up', 5)}</td><td>${num(fN(x.native))}</td>
-      <td>${num(fC(cpl))}${delta(cpl, div(q.spend, q.crm), 'down')}</td><td>${num(fC(div(x.spend, x.native)))}</td><td>${num(fN(x.visits))}</td><td>${num(fP(div(x.crm, x.visits), 2))}</td></tr>`;
+      <td>${num(fC(cpl))}${delta(cpl, cplOf(q.spend, q.crm), 'down')}</td><td>${num(fC(cplOf(x.spend, x.native)))}</td><td>${num(fN(x.visits))}</td><td>${num(fP(div(x.crm, x.visits), 2))}</td></tr>`;
   }).join('');
   const pcTot = Object.values(pcAgg).reduce((o, x) => { for (const k of Object.keys(o)) o[k] += x[k]; return o; }, blankP());
 
@@ -397,7 +432,7 @@ function render({ ds, from, to, lang, perf }) {
   root.innerHTML = `
   <section><div class="sec-h"><h2>${t('insights')}</h2><p>${esc(t('insightsSub')(n, `${pFrom} → ${pTo}`))}</p></div><div class="ins-grid">${insHtml}</div></section>
 
-  <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(t('vsPrev'))}</p></div>
+  <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(t('vsPrev'))}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
     <div class="kpis">
       ${kpi(t('spend'), fU(pt.spend), delta(pt.spend, pp.spend, 'neutral'))}
       ${kpi(t('crmLeads'), fN(pt.crm), delta(pt.crm, pp.crm, 'up', 5))}
