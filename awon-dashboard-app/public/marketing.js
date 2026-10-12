@@ -30,6 +30,10 @@ const T = {
     n4: 'Organic CPL: Meta, TikTok and Snapchat use the branding spend on that platform; website organic uses the organic budget from the Daily tab; partners and PR have no direct spend.',
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
     n6: 'Insights compare the selected period with the same number of days just before it, and ignore sources with too little volume to judge.',
+    n7: 'WhatsApp campaign numbers (sent, delivered, seen, leads, spend) come from the Awon WA Performance Report sheet. Rates: delivered / sent, seen / delivered, leads / delivered.',
+    waRep: 'WhatsApp campaigns', waRepSub: 'From the WA Performance Report sheet', waRepNone: 'No rows filled in the WA Performance Report for this period yet.',
+    sent: 'Sent', delivered: 'Delivered', seen: 'Seen', repLeads: 'Leads (report)', repSpend: 'Spend (report)', repCpl: 'CPL (report)',
+    delivRate: 'Delivery rate', seenRate: 'Seen rate', leadRate: 'Lead rate', cpm: 'Cost per 1K delivered', ofSent: 'of sent', ofDeliv: 'of delivered',
     up: 'up', down: 'down',
     // insight templates
     iCplGood: (s, p, a, b) => `${s}: CRM CPL ${p} lower (${a} vs ${b})`,
@@ -78,6 +82,10 @@ const T = {
     n4: 'تكلفة العميل العضوي: ميتا وتيك توك وسناب تستخدم إنفاق العلامة على المنصة نفسها؛ الموقع يستخدم ميزانية العضوي من التبويب اليومي؛ الشركاء والعلاقات العامة بلا إنفاق مباشر.',
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
     n6: 'الملاحظات تقارن الفترة المحددة بنفس عدد الأيام قبلها مباشرة، وتتجاهل المصادر ذات الحجم القليل.',
+    n7: 'أرقام حملات واتساب (المرسلة، المستلمة، المقروءة، العملاء، الإنفاق) من شيت تقرير أداء واتساب. النسب: المستلمة / المرسلة، المقروءة / المستلمة، العملاء / المستلمة.',
+    waRep: 'حملات واتساب', waRepSub: 'من شيت تقرير أداء واتساب', waRepNone: 'لا توجد بيانات مدخلة في تقرير أداء واتساب لهذه الفترة بعد.',
+    sent: 'المرسلة', delivered: 'المستلمة', seen: 'المقروءة', repLeads: 'العملاء (التقرير)', repSpend: 'الإنفاق (التقرير)', repCpl: 'تكلفة العميل (التقرير)',
+    delivRate: 'نسبة الاستلام', seenRate: 'نسبة القراءة', leadRate: 'نسبة التحويل', cpm: 'التكلفة لكل 1000 مستلمة', ofSent: 'من المرسلة', ofDeliv: 'من المستلمة',
     up: 'ارتفاع', down: 'انخفاض',
     iCplGood: (s, p, a, b) => `${s}: تكلفة عميل CRM أقل بـ ${p} (${a} مقابل ${b})`,
     iCplBad: (s, p, a, b) => `${s}: تكلفة عميل CRM أعلى بـ ${p} (${a} مقابل ${b})`,
@@ -142,7 +150,7 @@ function delta(cur, prev, good = 'up', minBase = 0) {
 // ---------------- aggregation ----------------
 function blankP() { return { spend: 0, native: 0, crm: 0, clicks: 0, visits: 0, won: 0, kg: 0, brand: 0 }; }
 function aggregate(ds, from, to) {
-  const A = { paid: {}, paidCity: {}, org: {}, wa: { spend: 0, crm: 0 }, waCity: {}, sheetCity: {}, orgSheetSpend: 0, orgVisitsAll: 0, days: {} };
+  const A = { paid: {}, paidCity: {}, org: {}, wa: { spend: 0, crm: 0 }, waCity: {}, waR: { spend: 0, sent: 0, delivered: 0, seen: 0, leads: 0, n: 0 }, waRCity: {}, sheetCity: {}, orgSheetSpend: 0, orgVisitsAll: 0, days: {} };
   for (const p of [...PAID, 'untagged']) A.paid[p] = blankP();
   for (const p of ORG) A.org[p] = { leads: 0, visits: 0, spend: 0 };
   const day = d => A.days[d] || (A.days[d] = { paid: {}, org: {}, waSpend: 0, waCrm: 0, paidSpend: 0, paidCrm: 0, paidNative: 0, paidVisits: 0, orgLeads: 0, orgVisits: 0, orgSpend: 0, sheet: {} });
@@ -229,6 +237,15 @@ function aggregate(ds, from, to) {
     sc.pl += pl; sc.ps += ps; sc.ol += ol; sc.os += os; sc.wl += wl; sc.ws += ws;
     const w = A.waCity[c] || (A.waCity[c] = { crm: 0 }); w.spend = (w.spend || 0) + ws;
   }
+  // WhatsApp campaign report: [date, city, spend, sent, delivered, seen, leads]
+  const WR = ['spend', 'sent', 'delivered', 'seen', 'leads'];
+  for (const r of ((ds.waReport && ds.waReport.rows) || [])) {
+    const [d, c] = r;
+    if (d < from || d > to) continue;
+    const D = day(d), dw = D.waR || (D.waR = { spend: 0, sent: 0, delivered: 0, seen: 0, leads: 0 }), cw = A.waRCity[c] || (A.waRCity[c] = { spend: 0, sent: 0, delivered: 0, seen: 0, leads: 0 });
+    WR.forEach((k, i) => { A.waR[k] += r[2 + i]; dw[k] += r[2 + i]; cw[k] += r[2 + i]; });
+    A.waR.n++;
+  }
   // organic spend per platform: branding of that platform; website gets the sheet's organic spend plus other branding
   for (const [op, bp] of Object.entries(ORG_BRAND)) A.org[op].spend = A.paid[bp].brand;
   A.org.o_web.spend = A.orgSheetSpend + orgBrandWeb;
@@ -297,6 +314,13 @@ function insights(cur, prev, nDays) {
     }
     if (prev.wa.crm >= minLeads && cur.wa.crm <= prev.wa.crm * 0.75) add('bad', 3, t('iLeadsDown')(name, pc(cur.wa.crm, prev.wa.crm), fN(cur.wa.crm)), t('aLeadsDown')(name));
   }
+  // WhatsApp campaign report
+  { const c = cplOf(cur.waR.spend, cur.waR.leads), q = cplOf(prev.waR.spend, prev.waR.leads), name = t('waRep');
+    if (cur.waR.leads >= minLeads && prev.waR.leads >= minLeads && c && q) {
+      if (c / q - 1 <= -0.15) add('good', (1 - c / q) * 5, t('iCplGood')(name, pc(c, q), fC(c), fC(q)), t('aScale')(name));
+      else if (c / q - 1 >= 0.15) add('bad', (c / q - 1) * 5, t('iCplBad')(name, pc(c, q), fC(c), fC(q)), t('aFix')(name));
+    }
+  }
   const order = { bad: 0, good: 1, info: 2 };
   return out.sort((a, b) => order[a.kind] - order[b.kind] || b.score - a.score).slice(0, 8);
 }
@@ -321,6 +345,31 @@ function kpi(label, val, d, sub) {
   return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(val)}</div><div class="t"><span>${sub ? esc(sub) : ''}</span>${d || ''}</div></div>`;
 }
 function weekStart(iso) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0, 10); }
+
+function waReport(C, P) {
+  const W = C.waR, V = P.waR;
+  const head = `<div class="tbl-head" style="margin-top:22px"><h3 class="ch">${esc(t('waRep'))}</h3><span class="muted">${esc(t('waRepSub'))}</span></div>`;
+  if (!W.n) return head + `<div class="panel"><p class="muted" style="margin:0">${esc(t('waRepNone'))}</p></div>`;
+  const dr = x => div(x.delivered, x.sent), sr = x => div(x.seen, x.delivered), lr = x => div(x.leads, x.delivered), cpm = x => (x.delivered ? x.spend / x.delivered * 1000 : null);
+  const kp = `<div class="kpis">
+      ${kpi(t('sent'), fN(W.sent), delta(W.sent, V.sent, 'up', 100))}
+      ${kpi(t('delivered'), fN(W.delivered), delta(W.delivered, V.delivered, 'up', 100), t('delivRate') + ' ' + fP(dr(W), 1))}
+      ${kpi(t('seen'), fN(W.seen), delta(W.seen, V.seen, 'up', 100), t('seenRate') + ' ' + fP(sr(W), 1))}
+      ${kpi(t('repLeads'), fN(W.leads), delta(W.leads, V.leads, 'up', 5), t('leadRate') + ' ' + fP(lr(W), 2))}
+      ${kpi(t('repSpend'), fU(W.spend), delta(W.spend, V.spend, 'neutral'))}
+      ${kpi(t('repCpl'), fC(cplOf(W.spend, W.leads)), delta(cplOf(W.spend, W.leads), cplOf(V.spend, V.leads), 'down'))}
+      ${kpi(t('cpm'), fC(cpm(W)), delta(cpm(W), cpm(V), 'down'))}
+      ${kpi(t('crmLeads'), fN(C.wa.crm), delta(C.wa.crm, P.wa.crm, 'up', 5))}
+    </div>`;
+  const row = (label, x, q) => `<td>${num(fU(x.spend))}</td><td>${num(fN(x.sent))}</td><td>${num(fN(x.delivered))}</td><td>${num(fP(dr(x), 1))}</td><td>${num(fN(x.seen))}</td><td>${num(fP(sr(x), 1))}</td>
+      <td>${num(fN(x.leads))}${q ? delta(x.leads, q.leads, 'up', 5) : ''}</td><td>${num(fP(lr(x), 2))}</td><td>${num(fC(cplOf(x.spend, x.leads)))}${q ? delta(cplOf(x.spend, x.leads), cplOf(q.spend, q.leads), 'down') : ''}</td>`;
+  const cities = Object.keys(C.waRCity).sort((a, b) => C.waRCity[b].leads - C.waRCity[a].leads || C.waRCity[b].sent - C.waRCity[a].sent);
+  const crm = c => (C.waCity[c] && C.waCity[c].crm) || 0;
+  const tbl = `<div class="panel" style="margin-top:14px"><div class="tbl-wrap"><table class="mk"><thead><tr><th>${t('city')}</th><th>${t('spend')}</th><th>${t('sent')}</th><th>${t('delivered')}</th><th>${t('delivRate')}</th><th>${t('seen')}</th><th>${t('seenRate')}</th><th>${t('repLeads')}</th><th>${t('leadRate')}</th><th>${t('repCpl')}</th><th>${t('crmLeads')}</th></tr></thead>
+      <tbody>${cities.map(c => `<tr><td>${esc(cityName(c))}</td>${row(c, C.waRCity[c], P.waRCity[c])}<td>${num(fN(crm(c)))}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>${esc(t('total'))}</td>${row('', W, V)}<td>${num(fN(C.wa.crm))}</td></tr></tfoot></table></div></div>`;
+  return head + kp + tbl + `<div class="panel trend-panel" style="margin-top:14px"><div class="trend-cw"><canvas id="mkWaRep"></canvas></div></div>`;
+}
 
 function render({ ds, from, to, lang, perf }) {
   L = lang === 'ar' ? 'ar' : 'en';
@@ -388,6 +437,7 @@ function render({ ds, from, to, lang, perf }) {
   const sumS = list => list.reduce((o, s) => { for (const k of Object.keys(o)) o[k] += s[k]; return o; }, { pl: 0, ps: 0, ol: 0, os: 0, wl: 0, ws: 0 });
   const grpHead = (first) => `<thead><tr><th rowspan="2">${first}</th><th colspan="3" class="gh paid">${t('paid')}</th><th colspan="3" class="gh org">${t('organic')}</th><th colspan="3" class="gh wa">${t('wa')}</th><th colspan="3" class="gh tot">${t('total')}</th></tr>
     <tr>${[0, 1, 2, 3].map(() => `<th class="gs">${t('spend')}</th><th>${t('leads')}</th><th>${t('cpl')}</th>`).join('')}</tr></thead>`;
+  const waRepHtml = waReport(C, P);
   const cityTable = grpHead(t('city')) + '<tbody>' + cityKeys.map(c => `<tr><td>${esc(cityName(c))}</td>${grpCells(C.sheetCity[c], P.sheetCity[c])}</tr>`).join('') + '</tbody>' +
     `<tfoot><tr><td>${esc(t('total'))}</td>${grpCells(sumS(Object.values(C.sheetCity)), sumS(Object.values(P.sheetCity)))}</tr></tfoot>`;
   // daily sheet
@@ -469,6 +519,7 @@ function render({ ds, from, to, lang, perf }) {
       ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'))}
     </div>
     <div class="panel trend-panel" style="margin-top:14px"><div class="trend-cw"><canvas id="mkWa"></canvas></div></div>
+    ${waRepHtml}
   </section>
 
   <section><div class="sec-h"><h2>${t('cities')}</h2></div>
@@ -494,7 +545,7 @@ function render({ ds, from, to, lang, perf }) {
       </tbody></table></div></div>
     </div>
   </section>
-  <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6'].map(k => `<li>${esc(t(k))}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
+  <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'].map(k => `<li>${esc(t(k))}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
 
   // --- charts
   const ds_ = Object.keys(C.days).filter(d => d >= from && d <= end).sort();
@@ -527,6 +578,17 @@ function render({ ds, from, to, lang, perf }) {
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.dataset.yAxisID === 'y2' ? fP(c.raw, 2) : fN(c.raw)}` } } } } });
   else chart('mkOrg', { data: { labels: lbl, datasets: ORG.map(p => bar(pName(p), ds_.map(d => (G(d).org[p] && G(d).org[p].leads) || 0), COL[p], 'o')) },
     options: { scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fN(v) } } } } });
+
+  if (document.getElementById('mkWaRep')) chart('mkWaRep', { data: { labels: lbl, datasets: [
+      bar(t('sent'), ds_.map(d => (G(d).waR ? G(d).waR.sent : null)), 'rgba(155,183,185,.6)'),
+      bar(t('delivered'), ds_.map(d => (G(d).waR ? G(d).waR.delivered : null)), 'rgba(12,163,157,.7)'),
+      bar(t('seen'), ds_.map(d => (G(d).waR ? G(d).waR.seen : null)), 'rgba(29,74,79,.8)'),
+      line(t('repLeads'), ds_.map(d => (G(d).waR ? G(d).waR.leads : null)), '#eda737', 'y2', 2.5),
+      line(t('repCpl'), ds_.map(d => (G(d).waR ? cplOf(G(d).waR.spend, G(d).waR.leads) : null)), '#b54e37', 'y3', 2, [5, 4])] },
+    options: { scales: { x: { reverse: L === 'ar', grid: { display: false }, ticks: { maxTicksLimit: 14 } },
+      y: { position: L === 'ar' ? 'right' : 'left', beginAtZero: true, grid: { color: 'rgba(29,74,79,.08)' }, ticks: { callback: v => fN(v) } },
+      y2: { position: L === 'ar' ? 'left' : 'right', beginAtZero: true, grid: { display: false }, ticks: { callback: v => fN(v) } },
+      y3: { display: false, beginAtZero: true } } } });
 
   chart('mkWa', { data: { labels: lbl, datasets: [
       bar(t('spend'), ds_.map(d => G(d).waSpend), 'rgba(12,163,157,.75)'),
