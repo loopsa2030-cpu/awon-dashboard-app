@@ -75,7 +75,9 @@ async function odooPart(to) {
     if (!utc) continue;
     const date = new Date(new Date(utc.replace(' ', 'T') + 'Z').getTime() + 3 * 3600e3).toISOString().slice(0, 10);
     const city = cityKey(stateName(g.state_id)) || 'unknown';
-    const { group, platform } = groupOf(g.source_id);
+    let { group, platform } = groupOf(g.source_id);
+    if (group === 'organic') platform = odoo.organicPlatform(g.source_id ? g.source_id[1] : '');
+    else if (group === 'wa') platform = null;
     const wonFlag = g.stage_id && /won/i.test(g.stage_id[1]) ? 1 : 0;
     const k = [date, city, group, platform, wonFlag].join('|');
     const a = agg.get(k) || [date, city, group, platform, wonFlag, 0, 0];
@@ -116,15 +118,17 @@ async function odooPart(to) {
 }
 
 async function adsPart(to, previous) {
-  if (!ads.configured()) return { platforms: {}, meta: { mode: 'not configured', errors: ['SUPERMETRICS_API_KEY is not set.'] } };
-  const r = await ads.dailySpend(FIRST_MONTH + '-01', to);
-  const platforms = {};
+  if (!ads.configured()) return { platforms: {}, camps: {}, ga: [], meta: { mode: 'not configured', errors: ['SUPERMETRICS_API_KEY is not set.'] } };
+  const r = await ads.load(FIRST_MONTH + '-01', to);
+  const platforms = {}, camps = {};
   const errors = [...(r.errors || [])];
-  for (const [p, list] of Object.entries(r.platforms)) {
-    if (!list.length && previous && previous.platforms[p] && previous.platforms[p].length) { platforms[p] = previous.platforms[p]; continue; }   // keep last good data if a platform fails
-    platforms[p] = list;
+  for (const p of Object.keys(r.platforms)) {
+    const failed = !r.platforms[p].length && previous && previous.platforms && previous.platforms[p] && previous.platforms[p].length;
+    platforms[p] = failed ? previous.platforms[p] : r.platforms[p];     // keep last good data if a platform fails
+    camps[p] = failed && previous.camps ? previous.camps[p] || [] : r.camps[p];
   }
-  return { platforms, meta: { mode: 'live', errors } };
+  const ga = r.ga.length ? r.ga : (previous && previous.ga) || [];
+  return { platforms, camps, ga, meta: { mode: 'live', errors } };
 }
 
 async function build() {
@@ -133,11 +137,11 @@ async function build() {
   const [sh, od, ad] = await Promise.all([
     sheetsPart(to),
     withTimeout(odooPart(to), 55000, 'Odoo').catch(e => { notes.push(e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error' } }; }),
-    withTimeout(adsPart(to, cached && cached.ads), 45000, 'Supermetrics').catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, meta: { mode: 'error', errors: [e.message] } }; }),
+    withTimeout(adsPart(to, cached && cached.ads), 50000, 'Supermetrics').catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
   ]);
   return {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
-    months: sh.months, odoo: { rows: od.rows }, donors: od.donors || { rows: [], cohorts: [] }, ads: { platforms: ad.platforms },
+    months: sh.months, odoo: { rows: od.rows }, donors: od.donors || { rows: [], cohorts: [] }, ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [] },
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors } },
     notes: [...sh.notes, ...notes],
   };

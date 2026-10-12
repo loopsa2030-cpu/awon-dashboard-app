@@ -65,4 +65,14 @@ function classify(src) {
   return { group, platform };
 }
 
-module.exports = { configured, readGroup, call, SCOPE, ksaRange, classify };
+// Organic sub-platform from the Odoo source name (keys are prefixed so they never mix with paid platforms)
+function organicPlatform(src) {
+  const s = String(src || '').toLowerCase();
+  if (/tiktok/.test(s)) return 'o_tiktok';
+  if (/snap/.test(s)) return 'o_snap';
+  if (/meta|facebook|instagram|\big\b/.test(s)) return 'o_meta';
+  if (/website|web-|form|^home$|newsletter|chatgpt|google|seo|blog|article/.test(s)) return 'o_web';
+  return 'o_other';
+}
+
+module.exports = { configured, readGroup, call, SCOPE, ksaRange, classify, organicPlatform };
