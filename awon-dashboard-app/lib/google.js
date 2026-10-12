@@ -6,6 +6,8 @@ const XLSX = require('xlsx');
 
 const MTD_FILE_ID = process.env.MTD_FILE_ID || '16U3UFk7Igj6k_j8kOThXWf605jLxjduX';
 const FORECAST_FILE_ID = process.env.FORECAST_FILE_ID || '1ixZTANNh4jxGUXckOJT0exK2oAkPfV22SNoB02FVAMk';
+const WA_FILE_ID = process.env.WA_FILE_ID || '16KwEToBq_DQQruotaZI6mDN1YUWLHX8szULo1IddmLc';   // Awon WA - Performance Report (native Google Sheet)
+const FILES = { mtd: [MTD_FILE_ID, false], forecast: [FORECAST_FILE_ID, true], wa: [WA_FILE_ID, true] };   // [id, export as xlsx]
 const TTL = 10 * 60 * 1000;
 const cache = new Map();
 
@@ -39,12 +41,12 @@ async function modifiedTime(fileId) {
 
 // Returns { sheetNames, read(tabNames) -> {name: worksheet}, modified }
 async function workbook(which) {
-  const id = which === 'mtd' ? MTD_FILE_ID : FORECAST_FILE_ID;
+  const [id, exportXlsx] = FILES[which];
   const hit = cache.get(which);
   if (hit && Date.now() - hit.at < TTL) return hit.value;
   const meta = await modifiedTime(id);
   if (hit && hit.value.modified === meta.modifiedTime) { hit.at = Date.now(); return hit.value; }
-  const buf = await fetchBytes(id, which === 'forecast');
+  const buf = await fetchBytes(id, exportXlsx);
   const names = XLSX.read(buf, { type: 'buffer', bookSheets: true }).SheetNames;
   const tabCache = {};
   const value = {
@@ -64,4 +66,4 @@ async function workbook(which) {
 
 async function request(url) { const c = await client(); const res = await c.request({ url }); return res.data; }
 
-module.exports = { workbook, configured, request, MTD_FILE_ID, FORECAST_FILE_ID };
+module.exports = { workbook, configured, request, MTD_FILE_ID, FORECAST_FILE_ID, WA_FILE_ID };

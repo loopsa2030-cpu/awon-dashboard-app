@@ -5,6 +5,7 @@ const odoo = require('./odoo');
 const { cityKey } = require('./cities');
 const ads = require('./ads');
 const history = require('./history');
+const wadata = require('./wadata');
 
 const TTL = 10 * 60 * 1000;
 let cached = null, building = null;
@@ -134,15 +135,17 @@ async function adsPart(to, previous) {
 async function build() {
   const to = todayKSA();
   const notes = [];
-  const [sh, od, ad] = await Promise.all([
+  const [sh, od, ad, wa] = await Promise.all([
     sheetsPart(to),
+    withTimeout(wadata.load(), 30000, 'WhatsApp report').catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     withTimeout(odooPart(to), 55000, 'Odoo').catch(e => { notes.push(e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error' } }; }),
     withTimeout(adsPart(to, cached && cached.ads), 50000, 'Supermetrics').catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
   ]);
   return {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
     months: sh.months, odoo: { rows: od.rows }, donors: od.donors || { rows: [], cohorts: [] }, ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [] },
-    sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors } },
+    waReport: { rows: wa.rows },
+    sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],
   };
 }
