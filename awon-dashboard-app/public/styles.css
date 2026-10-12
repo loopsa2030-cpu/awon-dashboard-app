@@ -238,3 +238,31 @@ td.ach{min-width:150px}
 .minibar i.good{background:var(--teal)} .minibar i.warn{background:var(--gold)} .minibar i.bad{background:var(--brick)}
 .achrow b{font:600 14px var(--display);min-width:44px;text-align:end}
 .achrow b.good{color:#0a7f7a} .achrow b.warn{color:#a8700f} .achrow b.bad{color:var(--brick)}
+
+/* ---------- Marketing tab ---------- */
+.ins-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px}
+.ins{background:#fff;border:1px solid var(--line);border-inline-start:5px solid var(--muted);border-radius:var(--r-md);padding:14px 16px}
+.ins.good{border-inline-start-color:var(--teal);background:linear-gradient(90deg,rgba(12,163,157,.07),#fff 60%)}
+.ins.bad{border-inline-start-color:var(--brick);background:linear-gradient(90deg,rgba(181,78,55,.07),#fff 60%)}
+.ins.info{border-inline-start-color:var(--gold);background:linear-gradient(90deg,rgba(237,167,55,.08),#fff 60%)}
+[dir=rtl] .ins.good{background:linear-gradient(270deg,rgba(12,163,157,.07),#fff 60%)}
+[dir=rtl] .ins.bad{background:linear-gradient(270deg,rgba(181,78,55,.07),#fff 60%)}
+[dir=rtl] .ins.info{background:linear-gradient(270deg,rgba(237,167,55,.08),#fff 60%)}
+.ins-t{font:600 14.5px/1.4 var(--display);color:var(--ink)}
+.ins-a{margin-top:6px;font-size:13.5px;color:var(--muted)}
+.ins-a::before{content:"→ ";color:var(--petrol);font-weight:600}
+[dir=rtl] .ins-a::before{content:"← "}
+.dl{display:block;font:500 11.5px var(--display);margin-top:1px}
+.kpi .dl{display:inline}
+.dl.good{color:#0a7f7a} .dl.bad{color:var(--brick)} .dl.flat{color:var(--muted)}
+td.warnc{color:#a8700f;font-weight:600}
+.tbl-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px 6px}
+.tbl-head .trend-tabs{margin:0}
+.tbl-head .ch{margin:0}
+table.mk td,table.mk th{white-space:nowrap}
+table.grp th.gh{text-align:center;border-bottom:2px solid var(--line)}
+table.grp th.gh.paid{color:var(--brick)} table.grp th.gh.org{color:#0a7f7a} table.grp th.gh.wa{color:var(--petrol)} table.grp th.gh.tot{color:var(--ink)}
+table.grp .gs{border-inline-start:1px solid var(--line)}
+.tbl-wrap.tall{max-height:520px;overflow:auto}
+.tbl-wrap.tall thead th{position:sticky;top:0;background:#fff;z-index:1}
+.tbl-wrap.tall thead tr:nth-child(2) th{top:37px}

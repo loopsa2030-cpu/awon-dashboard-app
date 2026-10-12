@@ -15,7 +15,7 @@ const T = {
     spendNote: 'Daily spend against the prorated spend target (incl. overhead); CPK is a 7-day rolling average.',
     volNote: 'Dashed lines are the daily targets; the pickup target is spread over operating days only (no Fridays).',
     title: 'Performance dashboard', subtitle: 'Marketing, logistics and donors across Saudi Arabia',
-    refresh: 'Refresh', tabPerf: 'Performance', tabMap: 'Donor map',
+    refresh: 'Refresh', tabPerf: 'Performance', tabMkt: 'Marketing', tabMap: 'Donor map',
     all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', custom: 'Pick dates…',
     northStar: 'North star: cost per kg collected', perKg: 'per kg',
     marketing: 'Marketing', logistics: 'Logistics', vsTarget: 'Actual against the forecast, prorated to the last reported day',
@@ -72,7 +72,7 @@ const T = {
     spendNote: 'الإنفاق اليومي مقابل مستهدف الإنفاق (شاملاً المصاريف العامة)؛ تكلفة الكيلو متوسط ٧ أيام.',
     volNote: 'الخطوط المتقطعة هي المستهدف اليومي؛ مستهدف الاستلامات موزع على أيام التشغيل فقط (بدون الجمعة).',
     title: 'لوحة الأداء', subtitle: 'التسويق واللوجستيات والمتبرعون في المملكة',
-    refresh: 'تحديث', tabPerf: 'الأداء', tabMap: 'خريطة المتبرعين',
+    refresh: 'تحديث', tabPerf: 'الأداء', tabMkt: 'التسويق', tabMap: 'خريطة المتبرعين',
     all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', custom: 'اختيار التواريخ…',
     northStar: 'المؤشر الأساسي: تكلفة الكيلوغرام المجمّع', perKg: 'لكل كغ',
     marketing: 'التسويق', logistics: 'اللوجستيات', vsTarget: 'الفعلي مقابل المستهدف حتى آخر يوم مُسجّل',
@@ -216,7 +216,7 @@ function render() {
   $$('[data-mcity]').forEach(b => { if (b.dataset.mcity === 'riyadh') b.textContent = lang === 'ar' ? 'الرياض' : 'Riyadh'; if (b.dataset.mcity === 'jeddah') b.textContent = lang === 'ar' ? 'جدة' : 'Jeddah'; });
   const { from, to } = resolve(state);
   $('#rangeLabel').innerHTML = `<b>${num(esc(t('dates')(from, to)))}</b>${perf?.range?.lastReported ? ' · ' + esc(t('lastRep')(perf.range.lastReported)) : ''}`;
-  renderFresh(); renderPerf(); renderMap();
+  renderFresh(); renderPerf(); renderMap(); renderMkt();
 }
 
 function renderFresh() {
@@ -585,20 +585,24 @@ $$('[data-preset]').forEach(b => b.addEventListener('click', e => {
 $('#lang').addEventListener('click', () => { lang = lang === 'ar' ? 'en' : 'ar'; localStorage.setItem('awon-lang', lang); picker.hidden = true; render(); });
 $('#refresh').addEventListener('click', () => load(true));
 function showTab(which) {
-  const isMap = which === 'map';
-  $('#tab-perf').setAttribute('aria-selected', String(!isMap)); $('#tab-map').setAttribute('aria-selected', String(isMap));
-  $('#view-perf').hidden = isMap; $('#view-map').hidden = !isMap;
-  location.hash = isMap ? 'map' : '';
-  if (isMap && !heat) { const r = resolve(state); loadHeat(r.from + '|' + r.to, r.from, r.to); }
-  renderMap();
+  for (const k of ['perf', 'mkt', 'map']) { $('#tab-' + k).setAttribute('aria-selected', String(k === which)); $('#view-' + k).hidden = k !== which; }
+  location.hash = which === 'perf' ? '' : which;
+  if (which === 'map' && !heat) { const r = resolve(state); loadHeat(r.from + '|' + r.to, r.from, r.to); }
+  renderMap(); renderMkt();
+}
+function renderMkt() {
+  if (!window.AwonMkt || $('#view-mkt').hidden) return;
+  const { from, to } = resolve(state);
+  try { $('#mktErr').innerHTML = ''; AwonMkt.render({ ds: dataset, from, to, lang, perf }); } catch (e) { console.error(e); $('#mktErr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 $('#tab-perf').addEventListener('click', () => showTab('perf'));
+$('#tab-mkt').addEventListener('click', () => showTab('mkt'));
 $('#tab-map').addEventListener('click', () => showTab('map'));
 $$('[data-tview]').forEach(b => b.addEventListener('click', () => { tview = b.dataset.tview; try { localStorage.setItem('awon-tview', tview); } catch (e) {} renderTrend(); }));
 $$('[data-metric]').forEach(b => b.addEventListener('click', () => { metric = b.dataset.metric; $$('[data-metric]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderMap(); }));
 $$('[data-mcity]').forEach(b => b.addEventListener('click', () => { mcity = b.dataset.mcity; $$('[data-mcity]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderMap(); }));
 
-if (location.hash === '#map') showTab('map');
+if (location.hash === '#map' || location.hash === '#mkt') showTab(location.hash.slice(1));
 render();
 load();
 setInterval(() => { if (!document.hidden) load(); }, 5 * 60 * 1000);   // background refresh; the CDN serves cached data instantly

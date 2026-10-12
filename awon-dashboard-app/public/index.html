@@ -26,6 +26,7 @@
   </div>
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-perf" aria-selected="true" aria-controls="view-perf" data-i18n="tabPerf">Performance</button>
+    <button class="tab" role="tab" id="tab-mkt" aria-selected="false" aria-controls="view-mkt" data-i18n="tabMkt">Marketing</button>
     <button class="tab" role="tab" id="tab-map" aria-selected="false" aria-controls="view-map" data-i18n="tabMap">Donor map</button>
   </nav>
 </header>
@@ -90,6 +91,11 @@
     <ul class="notes" id="notes"></ul>
   </div>
 
+  <div class="view" id="view-mkt" role="tabpanel" aria-labelledby="tab-mkt" hidden>
+    <div id="mktErr"></div>
+    <div id="mkt"></div>
+  </div>
+
   <div class="view" id="view-map" role="tabpanel" aria-labelledby="tab-map" hidden>
     <div class="map-tools">
       <button class="chip" data-metric="donations" data-i18n="donationsRec" aria-pressed="true">Donations received</button>
@@ -120,6 +126,7 @@
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="calc.js"></script>
+<script src="marketing.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
