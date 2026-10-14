@@ -155,9 +155,13 @@ async function build() {
 }
 // One summary line per build in the Vercel logs (counts and errors only, no customer data)
 function logBuild(d, took, ms) {
-  const camps = Object.fromEntries(Object.entries(d.ads.camps || {}).map(([k, v]) => [k, (v || []).length]));
-  console.log('dataset build ' + JSON.stringify({ ms, took, odoo: { mode: d.sources.odoo && d.sources.odoo.mode, error: d.sources.odoo && d.sources.odoo.error, rows: d.odoo.rows.length },
-    ads: { mode: d.sources.ads.mode, camps, ga: d.ads.ga.length, errors: d.sources.ads.errors }, wa: { mode: d.sources.waReport && d.sources.waReport.mode, rows: d.waReport.rows.length, error: d.sources.waReport && d.sources.waReport.error },
+  const n = v => (Array.isArray(v) ? v.length : typeof v);
+  const src = d.sources || {}, ads = d.ads || {};
+  const camps = Object.fromEntries(Object.entries(ads.camps || {}).map(([k, v]) => [k, n(v)]));
+  console.log('dataset build ' + JSON.stringify({ ms, took,
+    odoo: { mode: src.odoo && src.odoo.mode, error: src.odoo && src.odoo.error, rows: n(d.odoo && d.odoo.rows) },
+    ads: { mode: src.ads && src.ads.mode, camps, ga: n(ads.ga), errors: src.ads && src.ads.errors },
+    wa: { mode: src.waReport && src.waReport.mode, rows: n(d.waReport && d.waReport.rows), error: src.waReport && src.waReport.error },
     months: Object.keys(d.months || {}).length, notes: d.notes }));
 }
 
