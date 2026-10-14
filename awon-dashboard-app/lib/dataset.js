@@ -137,7 +137,7 @@ async function build() {
   const notes = [];
   const t0 = Date.now(), took = {};
   const timed = (k, p) => p.then(v => { took[k] = Date.now() - t0; return v; }, e => { took[k] = Date.now() - t0; throw e; });
-  const [sh, od, ad, wa] = await Promise.all([
+  const [sh, wa, od, ad] = await Promise.all([   // same order as the list below
     timed('sheets', sheetsPart(to)),
     timed('wa', withTimeout(wadata.load(), 60000, 'WhatsApp report')).catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     timed('odoo', withTimeout(odooPart(to), 150000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
