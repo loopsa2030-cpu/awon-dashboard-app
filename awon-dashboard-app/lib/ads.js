@@ -133,7 +133,7 @@ async function load(from, to) {
   const hit = cache.get(ck);
   if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.value;
   const errors = [];
-  const gaP = timeout(gaRaw(from, to), 45000, 'GA4').catch(e => { errors.push('GA4: ' + e.message); return []; });   // runs in parallel with the ad platforms
+  const gaP = timeout(gaRaw(from, to), 120000, 'GA4').catch(e => { errors.push('GA4: ' + e.message); return []; });   // runs in parallel with the ad platforms
   const entries = await Promise.all(Object.keys(PLATFORMS).map(async k => {
     try { const r = await queryPlatform(k, from, to); if (r.rows.fallback) errors.push(`${k}: campaign detail unavailable (${r.rows.fallback})`); return [k, r]; }
     catch (e) { errors.push(`${k}: ${e.message}`); return [k, { rows: [], ids: {} }]; }

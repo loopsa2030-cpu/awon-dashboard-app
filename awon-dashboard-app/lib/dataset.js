@@ -135,26 +135,38 @@ async function adsPart(to, previous) {
 async function build() {
   const to = todayKSA();
   const notes = [];
+  const t0 = Date.now(), took = {};
+  const timed = (k, p) => p.then(v => { took[k] = Date.now() - t0; return v; }, e => { took[k] = Date.now() - t0; throw e; });
   const [sh, od, ad, wa] = await Promise.all([
-    sheetsPart(to),
-    withTimeout(wadata.load(), 30000, 'WhatsApp report').catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
-    withTimeout(odooPart(to), 55000, 'Odoo').catch(e => { notes.push(e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error' } }; }),
-    withTimeout(adsPart(to, cached && cached.ads), 50000, 'Supermetrics').catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
+    timed('sheets', sheetsPart(to)),
+    timed('wa', withTimeout(wadata.load(), 60000, 'WhatsApp report')).catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
+    timed('odoo', withTimeout(odooPart(to), 150000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
+    timed('ads', withTimeout(adsPart(to, cached && cached.ads), 150000, 'Supermetrics')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
   ]);
-  return {
+  const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
     months: sh.months, odoo: { rows: od.rows }, donors: od.donors || { rows: [], cohorts: [] }, ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [] },
     waReport: { rows: wa.rows },
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],
   };
+  try { logBuild(out, took, Date.now() - t0); } catch (e) { console.error('log failed', e.message); }
+  return out;
+}
+// One summary line per build in the Vercel logs (counts and errors only, no customer data)
+function logBuild(d, took, ms) {
+  const camps = Object.fromEntries(Object.entries(d.ads.camps || {}).map(([k, v]) => [k, (v || []).length]));
+  console.log('dataset build ' + JSON.stringify({ ms, took, odoo: { mode: d.sources.odoo && d.sources.odoo.mode, error: d.sources.odoo && d.sources.odoo.error, rows: d.odoo.rows.length },
+    ads: { mode: d.sources.ads.mode, camps, ga: d.ads.ga.length, errors: d.sources.ads.errors }, wa: { mode: d.sources.waReport && d.sources.waReport.mode, rows: d.waReport.rows.length, error: d.sources.waReport && d.sources.waReport.error },
+    months: Object.keys(d.months || {}).length, notes: d.notes }));
 }
 
 // Returns cached data immediately when available; refreshes in the background once it is older than TTL.
 async function get({ waitUntil } = {}) {
   const fresh = cached && Date.now() - cached._at < TTL;
   if (fresh) return cached.data;
-  if (!building) building = build().then(d => { cached = { data: d, _at: Date.now() }; cached.odoo = d.odoo; cached.ads = d.ads; return d; }).finally(() => { building = null; });
+  if (!building) building = build().then(d => { const degraded = ['odoo', 'ads'].some(k => d.sources[k] && d.sources[k].mode === 'error'); cached = { data: d, _at: degraded ? Date.now() - TTL + 60000 : Date.now() };   // a failed source retries after 1 min instead of 10
+    cached.odoo = d.odoo; cached.ads = d.ads; return d; }).finally(() => { building = null; });
   if (cached) { if (waitUntil) waitUntil(building.catch(() => {})); return cached.data; }
   return building;
 }
