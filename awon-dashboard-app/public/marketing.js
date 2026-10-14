@@ -31,6 +31,7 @@ const T = {
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
     n6: 'Insights compare the selected period with the same number of days just before it, and ignore sources with too little volume to judge.',
     n7: 'WhatsApp campaign numbers (sent, delivered, seen, leads, spend) come from the Awon WA Performance Report sheet. Rates: delivered / sent, seen / delivered, leads / delivered.',
+    srcOdoo: 'CRM leads from Odoo did not load', srcAds: 'Ad platform and GA4 data did not load', srcRetry: 'The server retries every minute; click Refresh in a minute or two.',
     waRep: 'WhatsApp campaigns', waRepSub: 'From the WA Performance Report sheet', waRepNone: 'No rows filled in the WA Performance Report for this period yet.',
     sent: 'Sent', delivered: 'Delivered', seen: 'Seen', repLeads: 'Leads (report)', repSpend: 'Spend (report)', repCpl: 'CPL (report)',
     delivRate: 'Delivery rate', seenRate: 'Seen rate', leadRate: 'Lead rate', cpm: 'Cost per 1K delivered', ofSent: 'of sent', ofDeliv: 'of delivered',
@@ -83,6 +84,7 @@ const T = {
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
     n6: 'الملاحظات تقارن الفترة المحددة بنفس عدد الأيام قبلها مباشرة، وتتجاهل المصادر ذات الحجم القليل.',
     n7: 'أرقام حملات واتساب (المرسلة، المستلمة، المقروءة، العملاء، الإنفاق) من شيت تقرير أداء واتساب. النسب: المستلمة / المرسلة، المقروءة / المستلمة، العملاء / المستلمة.',
+    srcOdoo: 'لم يتم تحميل عملاء CRM من Odoo', srcAds: 'لم يتم تحميل بيانات المنصات الإعلانية وGA4', srcRetry: 'يعيد الخادم المحاولة كل دقيقة؛ اضغط تحديث بعد دقيقة أو دقيقتين.',
     waRep: 'حملات واتساب', waRepSub: 'من شيت تقرير أداء واتساب', waRepNone: 'لا توجد بيانات مدخلة في تقرير أداء واتساب لهذه الفترة بعد.',
     sent: 'المرسلة', delivered: 'المستلمة', seen: 'المقروءة', repLeads: 'العملاء (التقرير)', repSpend: 'الإنفاق (التقرير)', repCpl: 'تكلفة العميل (التقرير)',
     delivRate: 'نسبة الاستلام', seenRate: 'نسبة القراءة', leadRate: 'نسبة التحويل', cpm: 'التكلفة لكل 1000 مستلمة', ofSent: 'من المرسلة', ofDeliv: 'من المستلمة',
@@ -346,6 +348,13 @@ function kpi(label, val, d, sub) {
 }
 function weekStart(iso) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0, 10); }
 
+// Banner when a data source failed on the server, so empty numbers are never mistaken for zero
+function srcWarn(ds) {
+  const S = ds.sources || {}, out = [];
+  if (S.odoo && S.odoo.mode === 'error') out.push(t('srcOdoo') + (S.odoo.error ? ' (' + S.odoo.error + ')' : ''));
+  if (S.ads && S.ads.mode === 'error') out.push(t('srcAds') + ((S.ads.errors || [])[0] ? ' (' + S.ads.errors[0] + ')' : ''));
+  return out.length ? `<div class="mk-warn">${out.map(esc).join('<br>')}<br>${esc(t('srcRetry'))}</div>` : '';
+}
 function waReport(C, P) {
   const W = C.waR, V = P.waR;
   const head = `<div class="tbl-head" style="margin-top:22px"><h3 class="ch">${esc(t('waRep'))}</h3><span class="muted">${esc(t('waRepSub'))}</span></div>`;
@@ -479,7 +488,7 @@ function render({ ds, from, to, lang, perf }) {
   const heatCell = (x, ref) => { const v = x ? div(x.spend, x.crm) : null; if (v == null || !ref || !x || x.crm < 5) return `<td>${num(v == null ? '-' : fC(v))}</td>`; const r = v / ref - 1, a = Math.min(1, Math.abs(r) * 2);
     return `<td style="background:${r < 0 ? `rgba(12,163,157,${(0.06 + a * 0.5).toFixed(2)})` : `rgba(181,78,55,${(0.05 + a * 0.4).toFixed(2)})`}">${num(fC(v))}<span class="sub">${num(fN(x.crm))}</span></td>`; };
 
-  root.innerHTML = `
+  root.innerHTML = `${srcWarn(ds)}
   <section><div class="sec-h"><h2>${t('insights')}</h2><p>${esc(t('insightsSub')(n, `${pFrom} → ${pTo}`))}</p></div><div class="ins-grid">${insHtml}</div></section>
 
   <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(t('vsPrev'))}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
@@ -545,7 +554,7 @@ function render({ ds, from, to, lang, perf }) {
       </tbody></table></div></div>
     </div>
   </section>
-  <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'].map(k => `<li>${esc(t(k))}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
+  <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'].map(k => `<li>${esc(t(k))}</li>`).join('')}${(ds.notes || []).map(e => `<li>${esc(e)}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
 
   // --- charts
   const ds_ = Object.keys(C.days).filter(d => d >= from && d <= end).sort();
