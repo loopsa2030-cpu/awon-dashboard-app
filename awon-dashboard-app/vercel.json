@@ -1,7 +1,7 @@
 {
   "regions": ["fra1"],
   "functions": {
-    "api/dataset.js": { "maxDuration": 60, "includeFiles": "data/**" },
+    "api/dataset.js": { "maxDuration": 300, "includeFiles": "data/**" },
     "api/performance.js": { "maxDuration": 60, "includeFiles": "public/calc.js" },
     "api/heatmap.js": { "maxDuration": 60, "includeFiles": "data/**" },
     "api/status.js": { "maxDuration": 30 }
