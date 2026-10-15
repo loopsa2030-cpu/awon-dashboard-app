@@ -23,7 +23,7 @@ const T = {
     cohortTitle: 'Week by week per source', weekdayTitle: 'Day of week (average per day)', cityPlatTitle: 'Paid CRM CPL by city and platform',
     cohortNote: 'Weeks start on Sunday. Darker green = better than that source\'s average, darker red = worse.',
     notes: 'How these numbers work',
-    n1: 'Lead totals per group (Paid, Organic, WhatsApp) match the Daily sheet, same as Performance. The split by platform and source comes from Odoo: each day, Odoo leads are scaled to the sheet total for that group. The count currently in Odoo is shown under each total. Native leads are what each ad platform reports (Meta = WhatsApp conversations started).',
+    n1: 'Lead totals per group (Paid, Organic, WhatsApp) match the Daily sheet, same as Performance. The split by platform and source comes from Odoo: each day, Odoo leads are scaled to the sheet total for that group. Native leads are what each ad platform reports (Meta = WhatsApp conversations started).',
     noAds: 'Ad platform data is not available right now, so paid spend per platform is split by CRM leads. Totals are exact; per-platform CPLs are estimates until ad data returns (see notes at the bottom).',
     n2: 'Spend comes from the Daily sheet, same as Performance (the branding share of paid spend moves to Organic). Paid spend is split across platforms by each platform\'s lead-gen ad spend that day for that city (CRM lead mix when ad data is missing). Native leads and clicks come from the ad platforms; their city comes from the campaign name.',
     n3: 'Website visits are GA4 sessions. GA4 has no city data for this site, so paid visits get their city from the campaign name and organic visits have no city.',
@@ -78,7 +78,7 @@ const T = {
     cohortTitle: 'أسبوعاً بأسبوع لكل مصدر', weekdayTitle: 'حسب يوم الأسبوع (متوسط يومي)', cityPlatTitle: 'تكلفة عميل CRM المدفوع حسب المدينة والمنصة',
     cohortNote: 'الأسابيع تبدأ يوم الأحد. الأخضر الأغمق أفضل من متوسط المصدر، والأحمر الأغمق أسوأ.',
     notes: 'كيف تُحسب الأرقام',
-    n1: 'إجمالي العملاء لكل مجموعة (مدفوع، عضوي، واتساب) مطابق للشيت اليومي كما في قسم الأداء. التوزيع حسب المنصة والمصدر من Odoo: كل يوم تُعدل أرقام Odoo لتساوي إجمالي الشيت لتلك المجموعة. العدد الحالي في Odoo يظهر تحت كل إجمالي. عملاء المنصة كما تعلنها كل منصة إعلانية (ميتا = محادثات واتساب).',
+    n1: 'إجمالي العملاء لكل مجموعة (مدفوع، عضوي، واتساب) مطابق للشيت اليومي كما في قسم الأداء. التوزيع حسب المنصة والمصدر من Odoo: كل يوم تُعدل أرقام Odoo لتساوي إجمالي الشيت لتلك المجموعة. عملاء المنصة كما تعلنها كل منصة إعلانية (ميتا = محادثات واتساب).',
     noAds: 'بيانات المنصات الإعلانية غير متاحة حالياً، لذلك وُزع الإنفاق المدفوع على المنصات حسب عملاء CRM. الإجماليات دقيقة، وتكلفة العميل لكل منصة تقديرية حتى تعود بيانات الإعلانات (راجع الملاحظات أسفل الصفحة).',
     n2: 'الإنفاق من الشيت اليومي كما في قسم الأداء (حصة الحملات التوعوية تنتقل إلى العضوي). يوزع الإنفاق المدفوع على المنصات حسب إنفاق كل منصة على حملات جلب العملاء في نفس اليوم والمدينة (أو حسب توزيع عملاء CRM عند غياب بيانات الإعلانات). عملاء المنصة والنقرات من المنصات الإعلانية، والمدينة من اسم الحملة.',
     n3: 'زيارات الموقع هي جلسات GA4. لا توجد بيانات مدن في GA4 لهذا الموقع، لذلك المدينة للزيارات المدفوعة من اسم الحملة والزيارات العضوية بلا مدينة.',
@@ -554,7 +554,7 @@ function render({ ds, from, to, lang, perf }) {
   <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(t('vsPrev'))}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
     <div class="kpis">
       ${kpi(t('spend'), fU(pt.spend), delta(pt.spend, pp.spend, 'neutral'))}
-      ${kpi(t('crmLeads'), fN(pt.crm), delta(pt.crm, pp.crm, 'up', 5), t('inOdoo') + ' ' + fN(C.odooRaw.paid))}
+      ${kpi(t('crmLeads'), fN(pt.crm), delta(pt.crm, pp.crm, 'up', 5))}
       ${kpi(t('nativeLeads'), fN(pt.native), delta(pt.native, pp.native, 'up', 5))}
       ${tgtKpi(T, 'paid', pt.crm)}
       ${kpi(t('crmCpl'), fC(div(pt.spend, pt.crm)), delta(div(pt.spend, pt.crm), div(pp.spend, pp.crm), 'down'), tgtCplTxt(T, 'paid'))}
@@ -574,7 +574,7 @@ function render({ ds, from, to, lang, perf }) {
       ${kpi(t('spend'), fU(ot.spend), delta(ot.spend, op.spend, 'neutral'))}
       ${kpi(t('orgVisits'), fN(ot.visits), delta(ot.visits, op.visits))}
       ${kpi(t('cvr'), fP(div(ot.webLeads, ot.visits), 2), delta(div(ot.webLeads, ot.visits), div(op.webLeads, op.visits)))}
-      ${kpi(t('leads'), fN(ot.leads), delta(ot.leads, op.leads, 'up', 5), t('inOdoo') + ' ' + fN(C.odooRaw.organic))}
+      ${kpi(t('leads'), fN(ot.leads), delta(ot.leads, op.leads, 'up', 5))}
       ${tgtKpi(T, 'organic', ot.leads)}
       ${kpi(t('cpl'), fC(div(ot.spend, ot.leads)), delta(div(ot.spend, ot.leads), div(op.spend, op.leads), 'down'), tgtCplTxt(T, 'organic'))}
     </div>
@@ -586,7 +586,7 @@ function render({ ds, from, to, lang, perf }) {
   <section><div class="sec-h"><h2>${t('wa')}</h2><p>${esc(t('vsPrev'))}</p></div>
     <div class="kpis">
       ${kpi(t('spend'), fU(C.wa.spend), delta(C.wa.spend, P.wa.spend, 'neutral'))}
-      ${kpi(t('crmLeads'), fN(C.wa.crm), delta(C.wa.crm, P.wa.crm, 'up', 5), t('inOdoo') + ' ' + fN(C.odooRaw.wa))}
+      ${kpi(t('crmLeads'), fN(C.wa.crm), delta(C.wa.crm, P.wa.crm, 'up', 5))}
       ${tgtKpi(T, 'wa', C.wa.crm)}
       ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'), tgtCplTxt(T, 'wa'))}
     </div>
