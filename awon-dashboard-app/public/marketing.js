@@ -31,6 +31,7 @@ const T = {
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
     n6: 'Insights compare the selected period with the same number of days just before it, and ignore sources with too little volume to judge.',
     n7: 'WhatsApp campaign numbers (sent, delivered, seen, leads, spend) come from the Awon WA Performance Report sheet. Rates: delivered / sent, seen / delivered, leads / delivered.',
+    tgtTD: 'Leads target to date', tgtMonth: 'Month target', tgtCpl: 'Target', tgtLine: 'Daily target', achieved: 'achieved', dayTotal: 'Total',
     srcOdoo: 'CRM leads from Odoo did not load', srcAds: 'Ad platform and GA4 data did not load', srcRetry: 'The server retries every minute; click Refresh in a minute or two.',
     waRep: 'WhatsApp campaigns', waRepSub: 'From the WA Performance Report sheet', waRepNone: 'No rows filled in the WA Performance Report for this period yet.',
     sent: 'Sent', delivered: 'Delivered', seen: 'Seen', repLeads: 'Leads (report)', repSpend: 'Spend (report)', repCpl: 'CPL (report)',
@@ -84,6 +85,7 @@ const T = {
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
     n6: 'الملاحظات تقارن الفترة المحددة بنفس عدد الأيام قبلها مباشرة، وتتجاهل المصادر ذات الحجم القليل.',
     n7: 'أرقام حملات واتساب (المرسلة، المستلمة، المقروءة، العملاء، الإنفاق) من شيت تقرير أداء واتساب. النسب: المستلمة / المرسلة، المقروءة / المستلمة، العملاء / المستلمة.',
+    tgtTD: 'مستهدف العملاء حتى تاريخه', tgtMonth: 'مستهدف الشهر', tgtCpl: 'المستهدف', tgtLine: 'المستهدف اليومي', achieved: 'محقق', dayTotal: 'الإجمالي',
     srcOdoo: 'لم يتم تحميل عملاء CRM من Odoo', srcAds: 'لم يتم تحميل بيانات المنصات الإعلانية وGA4', srcRetry: 'يعيد الخادم المحاولة كل دقيقة؛ اضغط تحديث بعد دقيقة أو دقيقتين.',
     waRep: 'حملات واتساب', waRepSub: 'من شيت تقرير أداء واتساب', waRepNone: 'لا توجد بيانات مدخلة في تقرير أداء واتساب لهذه الفترة بعد.',
     sent: 'المرسلة', delivered: 'المستلمة', seen: 'المقروءة', repLeads: 'العملاء (التقرير)', repSpend: 'الإنفاق (التقرير)', repCpl: 'تكلفة العميل (التقرير)',
@@ -348,6 +350,45 @@ function kpi(label, val, d, sub) {
 }
 function weekStart(iso) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0, 10); }
 
+// Lead targets from the Forecast tab: each city's monthly target spread evenly over the month (same rule as Performance)
+const GRP = ['paid', 'organic', 'wa'];
+const dimOf = mk => new Date(Date.UTC(+mk.slice(0, 4), +mk.slice(5, 7), 0)).getUTCDate();
+function targets(ds, from, to) {
+  const T = { day: {}, sum: { paid: 0, organic: 0, wa: 0 }, month: { paid: 0, organic: 0, wa: 0 }, budget: { paid: 0, organic: 0, wa: 0 }, mLeads: { paid: 0, organic: 0, wa: 0 }, has: false };
+  const fc = mk => ds.months && ds.months[mk] && ds.months[mk].forecast;
+  for (let d = from; d <= to; d = addD(d, 1)) {
+    const f = fc(d.slice(0, 7)); if (!f) continue;
+    const days = f.daysInMonth || dimOf(d.slice(0, 7)), x = T.day[d] = { paid: 0, organic: 0, wa: 0 };
+    for (const c of f.cities) for (const g of GRP) { const v = (c[g].leads || 0) / days; x[g] += v; T.sum[g] += v; }
+    T.has = true;
+  }
+  const f = fc(to.slice(0, 7));
+  if (f) for (const c of f.cities) for (const g of GRP) { T.month[g] += c[g].leads || 0; T.mLeads[g] += c[g].leads || 0; T.budget[g] += c[g].budget || 0; }
+  return T;
+}
+// Leads vs target KPI: target to date, the month target, and how much of the target-to-date is achieved
+function tgtKpi(T, g, actual) {
+  if (!T.has || !T.sum[g]) return '';
+  const r = actual / T.sum[g], cls = r >= 1 ? 'good' : r >= 0.9 ? 'flat' : 'bad';
+  return kpi(t('tgtTD'), fN(T.sum[g]), `<span class="dl ${cls}">${num(fP(r, 0))} ${esc(t('achieved'))}</span>`, t('tgtMonth') + ' ' + fN(T.month[g]));
+}
+const tgtCplTxt = (T, g) => (T.mLeads[g] && T.budget[g] ? t('tgtCpl') + ' ' + fC(T.budget[g] / T.mLeads[g]) : '');
+// Chart.js plugin: writes the stacked total above each day's bar
+const stackTotals = { id: 'stackTotals', afterDatasetsDraw(ch) {
+  const { ctx } = ch, n = ch.data.labels.length; if (n > 45) return;
+  ctx.save(); ctx.font = '600 11px "IBM Plex Sans Arabic", sans-serif'; ctx.fillStyle = '#15373a'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  for (let i = 0; i < n; i++) {
+    let sum = 0, top = Infinity, x = null;
+    ch.data.datasets.forEach((d, k) => {
+      if (d.type !== 'bar' || !ch.isDatasetVisible(k)) return;
+      const v = Number(d.data[i]) || 0; sum += v;
+      const el = ch.getDatasetMeta(k).data[i]; if (!el) return;
+      top = Math.min(top, el.y); x = el.x;
+    });
+    if (sum > 0 && x != null) ctx.fillText(fN(sum), x, top - 3);
+  }
+  ctx.restore();
+} };
 // Banner when a data source failed on the server, so empty numbers are never mistaken for zero
 function srcWarn(ds) {
   const S = ds.sources || {}, out = [];
@@ -392,6 +433,7 @@ function render({ ds, from, to, lang, perf }) {
   if (lastRep && lastRep < end && lastRep >= from) end = lastRep;
   const n = days(from, end);
   const pFrom = addD(from, -n), pTo = addD(from, -1);
+  const T = targets(ds, from, end);
   const C = aggregate(ds, from, end), P = aggregate(ds, pFrom, pTo);
   const pt = C.paidT, pp = P.paidT;
 
@@ -496,7 +538,8 @@ function render({ ds, from, to, lang, perf }) {
       ${kpi(t('spend'), fU(pt.spend), delta(pt.spend, pp.spend, 'neutral'))}
       ${kpi(t('crmLeads'), fN(pt.crm), delta(pt.crm, pp.crm, 'up', 5))}
       ${kpi(t('nativeLeads'), fN(pt.native), delta(pt.native, pp.native, 'up', 5))}
-      ${kpi(t('crmCpl'), fC(div(pt.spend, pt.crm)), delta(div(pt.spend, pt.crm), div(pp.spend, pp.crm), 'down'))}
+      ${tgtKpi(T, 'paid', pt.crm)}
+      ${kpi(t('crmCpl'), fC(div(pt.spend, pt.crm)), delta(div(pt.spend, pt.crm), div(pp.spend, pp.crm), 'down'), tgtCplTxt(T, 'paid'))}
       ${kpi(t('nativeCpl'), fC(div(pt.spend, pt.native)), delta(div(pt.spend, pt.native), div(pp.spend, pp.native), 'down'))}
       ${kpi(t('paidVisits'), fN(pt.visits), delta(pt.visits, pp.visits))}
       ${kpi(t('cvr'), fP(div(pt.crm, pt.visits), 2), delta(div(pt.crm, pt.visits), div(pp.crm, pp.visits)))}
@@ -514,7 +557,8 @@ function render({ ds, from, to, lang, perf }) {
       ${kpi(t('orgVisits'), fN(ot.visits), delta(ot.visits, op.visits))}
       ${kpi(t('cvr'), fP(div(ot.webLeads, ot.visits), 2), delta(div(ot.webLeads, ot.visits), div(op.webLeads, op.visits)))}
       ${kpi(t('leads'), fN(ot.leads), delta(ot.leads, op.leads, 'up', 5))}
-      ${kpi(t('cpl'), fC(div(ot.spend, ot.leads)), delta(div(ot.spend, ot.leads), div(op.spend, op.leads), 'down'))}
+      ${tgtKpi(T, 'organic', ot.leads)}
+      ${kpi(t('cpl'), fC(div(ot.spend, ot.leads)), delta(div(ot.spend, ot.leads), div(op.spend, op.leads), 'down'), tgtCplTxt(T, 'organic'))}
     </div>
     <div class="panel" style="margin-top:14px"><div class="tbl-wrap"><table class="mk"><thead><tr><th>${t('source')}</th><th>${t('leads')}</th><th>${t('share')}</th><th>${t('orgVisits')}</th><th>${t('cvr')}</th><th>${t('spend')}</th><th>${t('cpl')}</th></tr></thead>
       <tbody>${orgRows}</tbody><tfoot><tr><td>${esc(t('total'))}</td><td>${num(fN(ot.leads))}${delta(ot.leads, op.leads, 'up', 5)}</td><td>100%</td><td>${num(fN(ot.visits))}</td><td>${num(fP(div(ot.webLeads, ot.visits), 2))}</td><td>${num(fU(ot.spend))}</td><td>${num(fC(div(ot.spend, ot.leads)))}</td></tr></tfoot></table></div></div>
@@ -525,7 +569,8 @@ function render({ ds, from, to, lang, perf }) {
     <div class="kpis">
       ${kpi(t('spend'), fU(C.wa.spend), delta(C.wa.spend, P.wa.spend, 'neutral'))}
       ${kpi(t('crmLeads'), fN(C.wa.crm), delta(C.wa.crm, P.wa.crm, 'up', 5))}
-      ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'))}
+      ${tgtKpi(T, 'wa', C.wa.crm)}
+      ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'), tgtCplTxt(T, 'wa'))}
     </div>
     <div class="panel trend-panel" style="margin-top:14px"><div class="trend-cw"><canvas id="mkWa"></canvas></div></div>
     ${waRepHtml}
@@ -562,6 +607,7 @@ function render({ ds, from, to, lang, perf }) {
   const line = (label, data, color, axis = 'y', w = 2, dash) => ({ type: 'line', label, data, borderColor: color, backgroundColor: color, pointRadius: dense ? 0 : 2, borderWidth: w, tension: .25, yAxisID: axis, borderDash: dash, spanGaps: true, order: 0 });
   const bar = (label, data, color, stack) => ({ type: 'bar', label, data, backgroundColor: color, borderRadius: 2, stack, order: 1 });
   const G = d => C.days[d];
+  const tgtLine = g => (T.has ? [line(t('tgtLine'), ds_.map(d => (T.day[d] ? Math.round(T.day[d][g]) : null)), '#b54e37', 'y', 2, [6, 4])] : []);
   if (ui.paidView === 'cpl') chart('mkPaid', { data: { labels: lbl, datasets: [
       line(t('total'), ds_.map(d => div(G(d).paidSpend, G(d).paidCrm)), '#15373a', 'y', 3),
       ...PAID.map(p => line(pName(p), ds_.map(d => { const x = G(d).paid[p]; return x ? div(x.spend, x.crm) : null; }), COL[p], 'y', 1.75))] },
@@ -577,16 +623,17 @@ function render({ ds, from, to, lang, perf }) {
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.dataset.yAxisID === 'y2' ? fP(c.raw, 2) : fN(c.raw)}` } } } } });
   else chart('mkPaid', { data: { labels: lbl, datasets: [
       ...[...PAID, 'untagged'].map(p => bar(pName(p), ds_.map(d => { const x = G(d).paid[p]; return x ? x.crm : 0; }), COL[p], 'l')),
-      line(t('crmCpl'), ds_.map(d => div(G(d).paidSpend, G(d).paidCrm)), '#15373a', 'y2', 2.5)] },
-    options: { scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fN(v) } }, y2: { ticks: { callback: v => '$' + fN(v, 2) } } } } });
+      ...tgtLine('paid'),
+      line(t('crmCpl'), ds_.map(d => div(G(d).paidSpend, G(d).paidCrm)), '#15373a', 'y2', 2.5)] }, plugins: [stackTotals],
+    options: { layout: { padding: { top: 16 } }, scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fN(v) } }, y2: { ticks: { callback: v => '$' + fN(v, 2) } } } } });
 
   if (ui.orgView === 'visits') chart('mkOrg', { data: { labels: lbl, datasets: [
       bar(t('orgVisits'), ds_.map(d => G(d).orgVisits), 'rgba(12,163,157,.8)'),
       line(t('cvr'), ds_.map(d => { const D = G(d); const l = ['o_web', 'o_meta', 'o_tiktok', 'o_snap'].reduce((a, p) => a + ((D.org[p] && D.org[p].leads) || 0), 0); return div(l, D.orgVisits); }), '#15373a', 'y2', 2.5)] },
     options: { scales: { x: {}, y: { ticks: { callback: v => fN(v) } }, y2: { ticks: { callback: v => fP(v, 0) } } },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.dataset.yAxisID === 'y2' ? fP(c.raw, 2) : fN(c.raw)}` } } } } });
-  else chart('mkOrg', { data: { labels: lbl, datasets: ORG.map(p => bar(pName(p), ds_.map(d => (G(d).org[p] && G(d).org[p].leads) || 0), COL[p], 'o')) },
-    options: { scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fN(v) } } } } });
+  else chart('mkOrg', { data: { labels: lbl, datasets: [...ORG.map(p => bar(pName(p), ds_.map(d => (G(d).org[p] && G(d).org[p].leads) || 0), COL[p], 'o')), ...tgtLine('organic')] }, plugins: [stackTotals],
+    options: { layout: { padding: { top: 16 } }, scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fN(v) } } } } });
 
   if (document.getElementById('mkWaRep')) chart('mkWaRep', { data: { labels: lbl, datasets: [
       bar(t('sent'), ds_.map(d => (G(d).waR ? G(d).waR.sent : null)), 'rgba(155,183,185,.6)'),
@@ -600,13 +647,15 @@ function render({ ds, from, to, lang, perf }) {
       y3: { display: false, beginAtZero: true } } } });
 
   chart('mkWa', { data: { labels: lbl, datasets: [
-      bar(t('spend'), ds_.map(d => G(d).waSpend), 'rgba(12,163,157,.75)'),
-      line(t('crmLeads'), ds_.map(d => G(d).waCrm), '#1d4a4f', 'y2', 2.5),
-      line(t('cpl'), ds_.map(d => cplOf(G(d).waSpend, G(d).waCrm)), '#eda737', 'y3', 2, [5, 4])] },
-    options: { scales: { x: { reverse: L === 'ar', grid: { display: false }, ticks: { maxTicksLimit: 14 } },
-      y: { position: L === 'ar' ? 'right' : 'left', beginAtZero: true, grid: { color: 'rgba(29,74,79,.08)' }, ticks: { callback: v => '$' + fN(v) } },
-      y2: { position: L === 'ar' ? 'left' : 'right', beginAtZero: true, grid: { display: false }, ticks: { callback: v => fN(v) } },
-      y3: { display: false, beginAtZero: true } } } });
+      bar(t('crmLeads'), ds_.map(d => G(d).waCrm), 'rgba(36,89,95,.8)'),
+      ...tgtLine('wa'),
+      line(t('cpl'), ds_.map(d => cplOf(G(d).waSpend, G(d).waCrm)), '#eda737', 'y2', 2, [5, 4]),
+      line(t('spend'), ds_.map(d => G(d).waSpend), '#0ca39d', 'y3', 2)] }, plugins: [stackTotals],
+    options: { layout: { padding: { top: 16 } }, scales: { x: { reverse: L === 'ar', grid: { display: false }, ticks: { maxTicksLimit: 14 } },
+      y: { position: L === 'ar' ? 'right' : 'left', beginAtZero: true, grid: { color: 'rgba(29,74,79,.08)' }, ticks: { callback: v => fN(v) } },
+      y2: { position: L === 'ar' ? 'left' : 'right', beginAtZero: true, grid: { display: false }, ticks: { callback: v => '$' + fN(v, 2) } },
+      y3: { display: false, beginAtZero: true } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.dataset.yAxisID === 'y' ? fN(c.raw) : '$' + fN(c.raw, 2)}` } } } } });
 
   $$('[data-mk]').forEach(b => b.addEventListener('click', () => { ui[b.dataset.mk] = b.dataset.v; saveUi(); render({ ds, from, to, lang, perf }); }));
 }

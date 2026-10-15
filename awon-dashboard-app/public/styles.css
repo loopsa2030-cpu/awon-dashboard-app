@@ -269,3 +269,4 @@ table.grp .gs{border-inline-start:1px solid var(--line)}
 
 .mk-warn{background:rgba(237,167,55,.14);border:1px solid rgba(237,167,55,.45);color:#7a520c;border-radius:10px;padding:10px 14px;margin:0 0 12px;font-size:13px;line-height:1.5}
 .muted{color:var(--muted);font-size:13px}
+.kpi .t .dl{white-space:nowrap}
