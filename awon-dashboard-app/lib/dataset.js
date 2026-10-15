@@ -6,6 +6,7 @@ const { cityKey } = require('./cities');
 const ads = require('./ads');
 const history = require('./history');
 const wadata = require('./wadata');
+const snapshot = require('./snapshot');
 
 const TTL = 10 * 60 * 1000;
 let cached = null, building = null;
@@ -180,13 +181,36 @@ function logBuild(d, took, ms) {
 }
 
 // Returns cached data immediately when available; refreshes in the background once it is older than TTL.
+// A new server instance starts from the last snapshot in Blob storage instead of rebuilding everything first.
+let snapLoad = null;
+function startBuild(waitUntil) {
+  if (building) return building;
+  building = build().then(d => {
+    const degraded = ['odoo', 'ads'].some(k => d.sources[k] && d.sources[k].mode === 'error');
+    cached = { data: d, _at: degraded ? Date.now() - TTL + 60000 : Date.now() };   // a failed source retries after 1 min instead of 10
+    cached.odoo = d.odoo; cached.ads = d.ads;
+    if (!degraded) {
+      const p = snapshot.save(d).then(n => console.log('snapshot saved ' + n + ' bytes')).catch(e => console.error('snapshot save failed', e.message));
+      if (waitUntil) waitUntil(p);
+    }
+    return d;
+  }).finally(() => { building = null; });
+  return building;
+}
 async function get({ waitUntil } = {}) {
+  if (!cached && snapshot.configured()) {
+    if (!snapLoad) snapLoad = withTimeout(snapshot.load(), 10000, 'Snapshot').catch(e => { console.error('snapshot load failed', e.message); return null; });
+    const d = await snapLoad;
+    if (d && !cached) {
+      cached = { data: d, _at: Date.parse(d.generatedAt) || 0, fromSnapshot: true };
+      cached.odoo = d.odoo; cached.ads = d.ads;
+    }
+  }
   const fresh = cached && Date.now() - cached._at < TTL;
   if (fresh) return cached.data;
-  if (!building) building = build().then(d => { const degraded = ['odoo', 'ads'].some(k => d.sources[k] && d.sources[k].mode === 'error'); cached = { data: d, _at: degraded ? Date.now() - TTL + 60000 : Date.now() };   // a failed source retries after 1 min instead of 10
-    cached.odoo = d.odoo; cached.ads = d.ads; return d; }).finally(() => { building = null; });
-  if (cached) { if (waitUntil) waitUntil(building.catch(() => {})); return cached.data; }
-  return building;
+  const p = startBuild(waitUntil);
+  if (cached) { if (waitUntil) waitUntil(p.catch(() => {})); return cached.data; }
+  return p;
 }
 
 module.exports = { get };
