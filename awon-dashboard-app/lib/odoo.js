@@ -60,7 +60,7 @@ function classify(src) {
   else if (/landingmeta|facebook|instagram/.test(s) && !/organic/.test(s)) platform = 'meta';
   else if (/landingtiktok/.test(s) || (/tiktok/.test(s) && !/organic/.test(s) && !/whatsapp/.test(s))) platform = 'tiktok';
   let group = 'organic';
-  if (/whatsapp|^wa[-_ ]|_wa$|old-customers|new-customers|new customers|loyalist|reminder|retention|-camp$|camp$/.test(s)) group = 'wa';   // WA broadcasts & CRM re-activation
+  if (/whatsapp|^wa[-_ ]|_wa$|old-customers|new-customers|new customers|loyal|reminder|retention|retarget|camp|discount.?code|^oct_old|goodshare/.test(s)) group = 'wa';   // WA broadcasts & CRM re-activation
   else if (platform || /paid|^landing/.test(s)) group = 'paid';
   return { group, platform };
 }

@@ -29,7 +29,12 @@ async function sheetsPart(to) {
 }
 
 // Source groups follow the Odoo favourites (ir.filters) so the team controls them in Odoo.
+// Listed in priority order: the team's current favourites first, the older March ones only fill gaps.
 const FAVOURITES = [
+  [/^awon paid leads$/i, 'paid'],
+  [/^awon retention leads$/i, 'wa'],
+  [/^awon organic leads$/i, 'organic'],
+  [/^awon (affil|onground)/i, 'organic'],
   [/^paid sources$/i, 'paid'],
   [/^awon retention\s+leads & sources$/i, 'wa'],
   [/^awon organic leads & sources$/i, 'organic'],
@@ -38,9 +43,9 @@ const FAVOURITES = [
 async function favouriteGroups() {
   const f = await odoo.call('ir.filters', 'search_read', [[['model_id', '=', 'crm.lead']]], { fields: ['name', 'domain'] });
   const map = {}, used = [];
-  for (const { name, domain } of f) {
-    const hit = FAVOURITES.find(([re]) => re.test(String(name).trim()));
-    if (!hit) continue;
+  const rank = name => FAVOURITES.findIndex(([re]) => re.test(String(name).trim()));
+  for (const { name, domain } of f.filter(x => rank(x.name) >= 0).sort((a, b) => rank(a.name) - rank(b.name))) {
+    const hit = FAVOURITES[rank(name)];
     const m = String(domain).match(/source_id["']?\s*,\s*["']in["']\s*,\s*\[([\d,\s]*)\]/);
     if (!m) continue;
     used.push(name);
