@@ -95,11 +95,16 @@ async function odooPart(to) {
 
   // New vs returning donors, matched by phone: a phone's first-ever received donation (Odoo + old customer data)
   // decides when it became a donor. The browser only receives anonymous indexes, never phone numbers.
-  let hist = new Map(), histNote = null;
-  // History is cached for 6 h; if the first load is slow, carry on without it this time and pick it up next refresh.
-  const hp = history.load();
-  try { hist = await Promise.race([hp, new Promise((_, rej) => setTimeout(() => rej(new Error('still loading, will apply on the next refresh')), 20000))]); }
-  catch (e) { histNote = 'Customer history sheet: ' + e.message; hp.catch(() => {}); }
+  // The history sheet is required: without it, every donor whose earlier donations are only in the old data
+  // would count as new. So we wait for it (cached 6 h), and if it fails the donor split is marked unavailable
+  // and the previous complete split is kept instead (see build()).
+  let hist = null, histNote = null;
+  try { hist = await withTimeout(history.load(), 120000, 'Customer history sheet'); }
+  catch (e) { histNote = 'Customer history sheet: ' + e.message; }
+  if (!hist || !hist.size) {
+    return { rows: [...agg.values()], donors: { base: FIRST_MONTH + '-01', rows: [], historyPhones: 0, unavailable: true, note: histNote || 'Customer history sheet is empty' },
+      meta: { mode: 'live', favourites: fav.used, unassigned: [...unassignedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[0]) } };
+  }
   const base = Date.parse(FIRST_MONTH + '-01T00:00:00Z');
   const dayIdx = iso => Math.round((Date.parse(iso + 'T00:00:00Z') - base) / 864e5);
   const firstSeen = new Map(hist);
@@ -117,9 +122,18 @@ async function odooPart(to) {
     if (!idx.has(ph)) idx.set(ph, idx.size);
     donorRows.push([dayIdx(date), idx.get(ph), dayIdx(firstSeen.get(ph))]);
   }
+  // Check line in the logs (counts only): this month's new vs returning, with the history sheet and with Odoo alone
+  try {
+    const m0 = todayKSA().slice(0, 7) + '-01', odooFirst = new Map();
+    for (const o of won) { const ph = history.normPhone(o.phone); const when = (o.date_closed || o.create_date || '').replace(' ', 'T'); if (!ph || !when) continue;
+      const date = new Date(new Date(when + 'Z').getTime() + 3 * 3600e3).toISOString().slice(0, 10); const c = odooFirst.get(ph); if (!c || date < c) odooFirst.set(ph, date); }
+    const month = new Set(orders.filter(([d]) => d >= m0).map(([, ph]) => ph));
+    let nH = 0, nO = 0; for (const ph of month) { if (firstSeen.get(ph) >= m0) nH++; if (odooFirst.get(ph) >= m0) nO++; }
+    console.log('donors check ' + JSON.stringify({ month: m0.slice(0, 7), donors: month.size, newWithHistory: nH, newOdooOnly: nO, historyPhones: hist.size }));
+  } catch (e) { console.error('donors check failed', e.message); }
   return {
     rows: [...agg.values()],
-    donors: { base: FIRST_MONTH + '-01', rows: donorRows, historyPhones: hist.size, note: histNote },
+    donors: { base: FIRST_MONTH + '-01', rows: donorRows, historyPhones: hist.size, note: null },
     meta: { mode: 'live', favourites: fav.used, unassigned: [...unassignedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[0]) },
   };
 }
@@ -138,6 +152,13 @@ async function adsPart(to, previous) {
   return { platforms, camps, ga, meta: { mode: 'live', errors } };
 }
 
+// Never replace a complete donor split with one built without the history sheet
+function donorsOrPrevious(d) {
+  if (d && !d.unavailable && d.historyPhones > 0) return d;
+  const prev = cached && cached.data && cached.data.donors;
+  if (prev && !prev.unavailable && prev.historyPhones > 0) return { ...prev, note: 'Kept from the previous refresh: ' + ((d && d.note) || 'history not loaded') };
+  return d || { base: FIRST_MONTH + '-01', rows: [], historyPhones: 0, unavailable: true, note: 'Donor history not loaded yet' };
+}
 async function build() {
   const to = todayKSA();
   const notes = [];
@@ -146,12 +167,12 @@ async function build() {
   const [sh, wa, od, ad] = await Promise.all([   // same order as the list below
     timed('sheets', sheetsPart(to)),
     timed('wa', withTimeout(wadata.load(), 60000, 'WhatsApp report')).catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
-    timed('odoo', withTimeout(odooPart(to), 150000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
+    timed('odoo', withTimeout(odooPart(to), 200000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     timed('ads', withTimeout(adsPart(to, cached && cached.ads), 150000, 'Supermetrics')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
   ]);
   const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
-    months: sh.months, odoo: { rows: od.rows }, donors: od.donors || { rows: [], cohorts: [] }, ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [] },
+    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [] },
     waReport: { rows: wa.rows },
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],
@@ -186,7 +207,7 @@ let snapLoad = null;
 function startBuild(waitUntil) {
   if (building) return building;
   building = build().then(d => {
-    const degraded = ['odoo', 'ads'].some(k => d.sources[k] && d.sources[k].mode === 'error');
+    const degraded = ['odoo', 'ads'].some(k => d.sources[k] && d.sources[k].mode === 'error') || !d.donors || d.donors.unavailable || !(d.donors.historyPhones > 0);
     cached = { data: d, _at: degraded ? Date.now() - TTL + 60000 : Date.now() };   // a failed source retries after 1 min instead of 10
     cached.odoo = d.odoo; cached.ads = d.ads;
     if (!degraded) {
@@ -201,7 +222,7 @@ async function get({ waitUntil } = {}) {
   if (!cached && snapshot.configured()) {
     if (!snapLoad) snapLoad = withTimeout(snapshot.load(), 10000, 'Snapshot').catch(e => { console.error('snapshot load failed', e.message); return null; });
     const d = await snapLoad;
-    if (d && !cached) {
+    if (d && !cached && d.donors && d.donors.historyPhones > 0) {
       cached = { data: d, _at: Date.parse(d.generatedAt) || 0, fromSnapshot: true };
       cached.odoo = d.odoo; cached.ads = d.ads;
     }
