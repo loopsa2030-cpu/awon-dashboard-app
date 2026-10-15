@@ -23,7 +23,7 @@ const T = {
     cohortTitle: 'Week by week per source', weekdayTitle: 'Day of week (average per day)', cityPlatTitle: 'Paid CRM CPL by city and platform',
     cohortNote: 'Weeks start on Sunday. Darker green = better than that source\'s average, darker red = worse.',
     notes: 'How these numbers work',
-    n1: 'CRM leads come from Odoo sources; native leads are what each ad platform reports (Meta = WhatsApp conversations started).',
+    n1: 'Lead totals per group (Paid, Organic, WhatsApp) match the Daily sheet, same as Performance. The split by platform and source comes from Odoo: each day, Odoo leads are scaled to the sheet total for that group. The count currently in Odoo is shown under each total. Native leads are what each ad platform reports (Meta = WhatsApp conversations started).',
     noAds: 'Ad platform data is not available right now, so paid spend per platform is split by CRM leads. Totals are exact; per-platform CPLs are estimates until ad data returns (see notes at the bottom).',
     n2: 'Spend comes from the Daily sheet, same as Performance (the branding share of paid spend moves to Organic). Paid spend is split across platforms by each platform\'s lead-gen ad spend that day for that city (CRM lead mix when ad data is missing). Native leads and clicks come from the ad platforms; their city comes from the campaign name.',
     n3: 'Website visits are GA4 sessions. GA4 has no city data for this site, so paid visits get their city from the campaign name and organic visits have no city.',
@@ -31,6 +31,7 @@ const T = {
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
     n6: 'Insights compare the selected period with the same number of days just before it, and ignore sources with too little volume to judge.',
     n7: 'WhatsApp campaign numbers (sent, delivered, seen, leads, spend) come from the Awon WA Performance Report sheet. Rates: delivered / sent, seen / delivered, leads / delivered.',
+    inOdoo: 'In Odoo now:',
     tgtTD: 'Leads target to date', tgtMonth: 'Month target', tgtCpl: 'Target', tgtLine: 'Daily target', achieved: 'achieved', dayTotal: 'Total',
     srcOdoo: 'CRM leads from Odoo did not load', srcAds: 'Ad platform and GA4 data did not load', srcRetry: 'The server retries every minute; click Refresh in a minute or two.',
     waRep: 'WhatsApp campaigns', waRepSub: 'From the WA Performance Report sheet', waRepNone: 'No rows filled in the WA Performance Report for this period yet.',
@@ -77,7 +78,7 @@ const T = {
     cohortTitle: 'أسبوعاً بأسبوع لكل مصدر', weekdayTitle: 'حسب يوم الأسبوع (متوسط يومي)', cityPlatTitle: 'تكلفة عميل CRM المدفوع حسب المدينة والمنصة',
     cohortNote: 'الأسابيع تبدأ يوم الأحد. الأخضر الأغمق أفضل من متوسط المصدر، والأحمر الأغمق أسوأ.',
     notes: 'كيف تُحسب الأرقام',
-    n1: 'عملاء CRM من مصادر Odoo؛ عملاء المنصة كما تعلنها كل منصة إعلانية (ميتا = محادثات واتساب).',
+    n1: 'إجمالي العملاء لكل مجموعة (مدفوع، عضوي، واتساب) مطابق للشيت اليومي كما في قسم الأداء. التوزيع حسب المنصة والمصدر من Odoo: كل يوم تُعدل أرقام Odoo لتساوي إجمالي الشيت لتلك المجموعة. العدد الحالي في Odoo يظهر تحت كل إجمالي. عملاء المنصة كما تعلنها كل منصة إعلانية (ميتا = محادثات واتساب).',
     noAds: 'بيانات المنصات الإعلانية غير متاحة حالياً، لذلك وُزع الإنفاق المدفوع على المنصات حسب عملاء CRM. الإجماليات دقيقة، وتكلفة العميل لكل منصة تقديرية حتى تعود بيانات الإعلانات (راجع الملاحظات أسفل الصفحة).',
     n2: 'الإنفاق من الشيت اليومي كما في قسم الأداء (حصة الحملات التوعوية تنتقل إلى العضوي). يوزع الإنفاق المدفوع على المنصات حسب إنفاق كل منصة على حملات جلب العملاء في نفس اليوم والمدينة (أو حسب توزيع عملاء CRM عند غياب بيانات الإعلانات). عملاء المنصة والنقرات من المنصات الإعلانية، والمدينة من اسم الحملة.',
     n3: 'زيارات الموقع هي جلسات GA4. لا توجد بيانات مدن في GA4 لهذا الموقع، لذلك المدينة للزيارات المدفوعة من اسم الحملة والزيارات العضوية بلا مدينة.',
@@ -85,6 +86,7 @@ const T = {
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
     n6: 'الملاحظات تقارن الفترة المحددة بنفس عدد الأيام قبلها مباشرة، وتتجاهل المصادر ذات الحجم القليل.',
     n7: 'أرقام حملات واتساب (المرسلة، المستلمة، المقروءة، العملاء، الإنفاق) من شيت تقرير أداء واتساب. النسب: المستلمة / المرسلة، المقروءة / المستلمة، العملاء / المستلمة.',
+    inOdoo: 'في Odoo الآن:',
     tgtTD: 'مستهدف العملاء حتى تاريخه', tgtMonth: 'مستهدف الشهر', tgtCpl: 'المستهدف', tgtLine: 'المستهدف اليومي', achieved: 'محقق', dayTotal: 'الإجمالي',
     srcOdoo: 'لم يتم تحميل عملاء CRM من Odoo', srcAds: 'لم يتم تحميل بيانات المنصات الإعلانية وGA4', srcRetry: 'يعيد الخادم المحاولة كل دقيقة؛ اضغط تحديث بعد دقيقة أو دقيقتين.',
     waRep: 'حملات واتساب', waRepSub: 'من شيت تقرير أداء واتساب', waRepNone: 'لا توجد بيانات مدخلة في تقرير أداء واتساب لهذه الفترة بعد.',
@@ -191,10 +193,19 @@ function aggregate(ds, from, to) {
       A.org[op].visits += s; (D.org[op] = D.org[op] || { leads: 0, visits: 0 }).visits += s;
     }
   }
-  // Odoo CRM leads
+  // Odoo CRM leads. Group totals follow the Daily sheet (as on Performance): each day, a group's Odoo leads are scaled
+  // to the sheet's number for that group, so platforms and sources keep Odoo's mix but add up to the sheet.
+  const sheetG = {}, odooG = {};
+  const gAdd = (o, d, g, v) => { const x = o[d] || (o[d] = { paid: 0, organic: 0, wa: 0 }); x[g] += v; };
+  for (const m of Object.values(ds.months || {})) for (const r of (m.rows || [])) if (r[0] >= from && r[0] <= to) { gAdd(sheetG, r[0], 'paid', r[2]); gAdd(sheetG, r[0], 'organic', r[4]); gAdd(sheetG, r[0], 'wa', r[6]); }
+  for (const r of ((ds.odoo && ds.odoo.rows) || [])) if (r[0] >= from && r[0] <= to && sheetG[r[0]] && r[2] in sheetG[r[0]]) gAdd(odooG, r[0], r[2], r[5]);
+  const fac = (d, g) => (sheetG[d] && odooG[d] && odooG[d][g] ? sheetG[d][g] / odooG[d][g] : 1);
+  A.odooRaw = { paid: 0, organic: 0, wa: 0 };
   const crmDay = {}, crmPer = { tot: 0, p: {} };
-  for (const [d, c, g, plat, won, n, kg] of ((ds.odoo && ds.odoo.rows) || [])) {
+  for (const [d, c, g, plat, won, n0, kg] of ((ds.odoo && ds.odoo.rows) || [])) {
     if (d < from || d > to) continue;
+    if (g in A.odooRaw) A.odooRaw[g] += n0;
+    const n = n0 * fac(d, g);
     const D = day(d);
     if (g === 'paid') {
       const p = PAID.includes(plat) ? plat : 'untagged';
@@ -208,6 +219,13 @@ function aggregate(ds, from, to) {
     } else if (g === 'wa') {
       A.wa.crm += n; D.waCrm += n; const w = A.waCity[c] || (A.waCity[c] = { crm: 0 }); w.crm += n;
     }
+  }
+  // Sheet leads on days Odoo has none for that group
+  for (const [d, x] of Object.entries(sheetG)) {
+    const o = odooG[d] || {}, D = day(d);
+    if (x.paid && !o.paid) { A.paid.untagged.crm += x.paid; pc('untagged', '').crm += x.paid; D.paidCrm += x.paid; (D.paid.untagged = D.paid.untagged || blankP()).crm += x.paid; }
+    if (x.organic && !o.organic) { A.org.o_other.leads += x.organic; D.orgLeads += x.organic; (D.org.o_other = D.org.o_other || { leads: 0, visits: 0 }).leads += x.organic; }
+    if (x.wa && !o.wa) { A.wa.crm += x.wa; D.waCrm += x.wa; }
   }
   // Daily tab (sheet): spend for every group, as on Performance. Branding share of paid spend moves to Organic (same rule as Performance).
   const brShare = d => { const x = adLg[d], y = adBr[d], l = x ? x.tot : 0, b = y ? y.tot : 0; return l + b > 0 ? b / (l + b) : (perLg.tot + perBr.tot > 0 ? perBr.tot / (perLg.tot + perBr.tot) : 0); };
@@ -536,7 +554,7 @@ function render({ ds, from, to, lang, perf }) {
   <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(t('vsPrev'))}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
     <div class="kpis">
       ${kpi(t('spend'), fU(pt.spend), delta(pt.spend, pp.spend, 'neutral'))}
-      ${kpi(t('crmLeads'), fN(pt.crm), delta(pt.crm, pp.crm, 'up', 5))}
+      ${kpi(t('crmLeads'), fN(pt.crm), delta(pt.crm, pp.crm, 'up', 5), t('inOdoo') + ' ' + fN(C.odooRaw.paid))}
       ${kpi(t('nativeLeads'), fN(pt.native), delta(pt.native, pp.native, 'up', 5))}
       ${tgtKpi(T, 'paid', pt.crm)}
       ${kpi(t('crmCpl'), fC(div(pt.spend, pt.crm)), delta(div(pt.spend, pt.crm), div(pp.spend, pp.crm), 'down'), tgtCplTxt(T, 'paid'))}
@@ -556,7 +574,7 @@ function render({ ds, from, to, lang, perf }) {
       ${kpi(t('spend'), fU(ot.spend), delta(ot.spend, op.spend, 'neutral'))}
       ${kpi(t('orgVisits'), fN(ot.visits), delta(ot.visits, op.visits))}
       ${kpi(t('cvr'), fP(div(ot.webLeads, ot.visits), 2), delta(div(ot.webLeads, ot.visits), div(op.webLeads, op.visits)))}
-      ${kpi(t('leads'), fN(ot.leads), delta(ot.leads, op.leads, 'up', 5))}
+      ${kpi(t('leads'), fN(ot.leads), delta(ot.leads, op.leads, 'up', 5), t('inOdoo') + ' ' + fN(C.odooRaw.organic))}
       ${tgtKpi(T, 'organic', ot.leads)}
       ${kpi(t('cpl'), fC(div(ot.spend, ot.leads)), delta(div(ot.spend, ot.leads), div(op.spend, op.leads), 'down'), tgtCplTxt(T, 'organic'))}
     </div>
@@ -568,7 +586,7 @@ function render({ ds, from, to, lang, perf }) {
   <section><div class="sec-h"><h2>${t('wa')}</h2><p>${esc(t('vsPrev'))}</p></div>
     <div class="kpis">
       ${kpi(t('spend'), fU(C.wa.spend), delta(C.wa.spend, P.wa.spend, 'neutral'))}
-      ${kpi(t('crmLeads'), fN(C.wa.crm), delta(C.wa.crm, P.wa.crm, 'up', 5))}
+      ${kpi(t('crmLeads'), fN(C.wa.crm), delta(C.wa.crm, P.wa.crm, 'up', 5), t('inOdoo') + ' ' + fN(C.odooRaw.wa))}
       ${tgtKpi(T, 'wa', C.wa.crm)}
       ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'), tgtCplTxt(T, 'wa'))}
     </div>
