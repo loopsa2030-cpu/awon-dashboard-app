@@ -151,7 +151,16 @@ async function build() {
     notes: [...sh.notes, ...notes],
   };
   try { logBuild(out, took, Date.now() - t0); } catch (e) { console.error('log failed', e.message); }
+  try { logRecon(out, to); } catch (e) { console.error('recon failed', e.message); }
   return out;
+}
+// Current month, per day: Daily sheet leads vs Odoo leads for each group [sheetPaid, odooPaid, sheetOrg, odooOrg, sheetWa, odooWa] (counts only)
+function logRecon(d, to) {
+  const m = d.months && d.months[to.slice(0, 7)]; if (!m) return;
+  const day = {}; const g = k => day[k] || (day[k] = [0, 0, 0, 0, 0, 0]);
+  for (const r of m.rows || []) { const x = g(r[0]); x[0] += r[2]; x[2] += r[4]; x[4] += r[6]; }
+  for (const r of (d.odoo && d.odoo.rows) || []) { if (r[0].slice(0, 7) !== to.slice(0, 7)) continue; const x = g(r[0]); const i = { paid: 1, organic: 3, wa: 5 }[r[2]]; if (i) x[i] += r[5]; }
+  console.log('recon ' + JSON.stringify(Object.keys(day).sort().map(k => [k.slice(8), ...day[k]])));
 }
 // One summary line per build in the Vercel logs (counts and errors only, no customer data)
 function logBuild(d, took, ms) {
