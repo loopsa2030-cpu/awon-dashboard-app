@@ -50,7 +50,7 @@ const T = {
     platform: 'Platform', crmLeads: 'CRM leads', platConv: 'Platform-reported', city: 'City',
     reconTxt: (a, b) => `Ad platforms report ${a} spend for this period; the Daily tab records ${b} as paid spend.`,
     lowAttr: 'few CRM leads tagged to this platform',
-    updated: 'Updated', live: 'Live', snapshot: 'Partial', total: 'Total', totalAll: 'All districts', from: 'From', to: 'To',
+    updated: 'Updated', refreshing: 'refreshing…', live: 'Live', snapshot: 'Partial', total: 'Total', totalAll: 'All districts', from: 'From', to: 'To',
     daysMode: 'Days', weeksMode: 'Weeks', monthsMode: 'Months', apply: 'Apply', pickStart: 'Pick a start and end day',
     nodata: 'No data for this period yet.', districts: 'Districts', totalOrders: 'Orders', totalKg: 'kg collected',
     district: 'District', approx: 'approx. location', unplaced: n => `${n} donations have no district on file and are not on the map.`,
@@ -107,7 +107,7 @@ const T = {
     platform: 'المنصة', crmLeads: 'عملاء CRM', platConv: 'تحويلات المنصة', city: 'المدينة',
     reconTxt: (a, b) => `تُظهر المنصات إنفاق ${a} لهذه الفترة، بينما يسجل التبويب اليومي ${b} كإنفاق مدفوع.`,
     lowAttr: 'عدد قليل من العملاء مرتبط بهذه المنصة',
-    updated: 'آخر تحديث', live: 'مباشر', snapshot: 'جزئي', total: 'الإجمالي', totalAll: 'كل الأحياء', from: 'من', to: 'إلى',
+    updated: 'آخر تحديث', refreshing: 'جارٍ التحديث…', live: 'مباشر', snapshot: 'جزئي', total: 'الإجمالي', totalAll: 'كل الأحياء', from: 'من', to: 'إلى',
     daysMode: 'أيام', weeksMode: 'أسابيع', monthsMode: 'أشهر', apply: 'تطبيق', pickStart: 'اختر يوم البداية والنهاية',
     nodata: 'لا توجد بيانات لهذه الفترة بعد.', districts: 'الأحياء', totalOrders: 'الطلبات', totalKg: 'كغ مجمّعة',
     district: 'الحي', approx: 'موقع تقريبي', unplaced: n => `${n} تبرعاً بلا حي مسجل ولا تظهر على الخريطة.`,
@@ -176,12 +176,24 @@ async function getJSON(u) {
 }
 // Data flow: /api/dataset is fetched once (and every 5 min); every timeframe is then computed in the
 // browser, so switching dates is instant. The map fetches per range, lazily, and caches per range.
-let dataset = null, dataErr = null;
+let dataset = null, dataErr = null, updating = false;
 const heatCache = new Map();
+// The last dataset is kept in this browser (Cache Storage), so the dashboard opens instantly with it
+// while the fresh copy loads in the background. Nothing here is required: if storage is blocked it just loads normally.
+const DS_CACHE = 'awon-dataset-v1', DS_KEY = '/api/dataset';
+async function readCachedDataset() {
+  try { const c = await caches.open(DS_CACHE); const r = await c.match(DS_KEY); return r ? await r.json() : null; } catch (e) { return null; }
+}
+async function saveCachedDataset(d) {
+  try { const c = await caches.open(DS_CACHE); await c.put(DS_KEY, new Response(JSON.stringify(d), { headers: { 'Content-Type': 'application/json' } })); } catch (e) { return; }   // storage blocked
+}
 async function fetchDataset(force) {
-  document.body.classList.add('loading');
-  try { dataset = await getJSON('/api/dataset' + (force ? '?t=' + Date.now() : '')); dataErr = null; }
-  catch (e) { dataErr = e.message; }
+  updating = true;
+  if (!dataset) document.body.classList.add('loading');
+  renderFresh();
+  try { dataset = await getJSON('/api/dataset' + (force ? '?t=' + Date.now() : '')); dataErr = null; saveCachedDataset(dataset); }
+  catch (e) { dataErr = dataset ? null : e.message; }
+  updating = false;
   document.body.classList.remove('loading');
 }
 function recompute() {
@@ -223,8 +235,10 @@ function renderFresh() {
   const modes = perf ? [perf.sources.sheets.mode, perf.sources.odoo.mode, perf.sources.ads.mode] : [];
   const allLive = modes.length && modes.every(m => m === 'live');
   $('#fresh .dot').classList.toggle('snap', !allLive);
-  const tm = new Intl.DateTimeFormat(loc(), { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' }).format(new Date());
-  $('#freshTxt').textContent = `${allLive ? t('live') : t('snapshot')} · ${t('updated')} ${tm}`;
+  const when = dataset && dataset.generatedAt ? new Date(dataset.generatedAt) : new Date();
+  const sameDay = new Date().toDateString() === when.toDateString();
+  const tm = new Intl.DateTimeFormat(loc(), sameDay ? { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' }).format(when);
+  $('#freshTxt').textContent = `${allLive ? t('live') : t('snapshot')} · ${t('updated')} ${tm}${updating ? ' · ' + t('refreshing') : ''}`;
 }
 
 function kpi(label, val, tgtVal, fmt, kind, mtv) {
@@ -604,6 +618,7 @@ $$('[data-mcity]').forEach(b => b.addEventListener('click', () => { mcity = b.da
 
 if (location.hash === '#map' || location.hash === '#mkt') showTab(location.hash.slice(1));
 render();
-load();
+// Show the last copy from this browser straight away, then load the fresh one
+readCachedDataset().then(d => { if (d && !dataset) { dataset = d; recompute(); } }).finally(() => load());
 setInterval(() => { if (!document.hidden) load(); }, 5 * 60 * 1000);   // background refresh; the CDN serves cached data instantly
 })();
