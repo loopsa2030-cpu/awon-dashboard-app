@@ -231,6 +231,8 @@ function render() {
   renderFresh(); renderPerf(); renderMap(); renderMkt();
 }
 
+// The donor split needs the customer history sheet; without it the server marks it unavailable rather than guessing
+const donorsNA = () => !!(dataset && dataset.donors && (dataset.donors.unavailable || !(dataset.donors.historyPhones > 0)));
 function renderFresh() {
   const modes = perf ? [perf.sources.sheets.mode, perf.sources.odoo.mode, perf.sources.ads.mode] : [];
   const allLive = modes.length && modes.every(m => m === 'live');
@@ -292,8 +294,8 @@ function renderPerf() {
   $('#kpiMkt').innerHTML = [
     kpi(t('spend'), T0.spend, T0.spendT, fmtUSD, 'pace', MT.spend),
     kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume', MT.leads),
-    kpiPlain(t('newDonors'), fmtN(perf.donors.newN), t('shareOfDonors')(fmtP(perf.donors.newShare))),
-    kpiPlain(t('retDonors'), fmtN(perf.donors.retN), t('shareOfDonors')(fmtP(perf.donors.newShare == null ? null : 1 - perf.donors.newShare))),
+    kpiPlain(t('newDonors'), donorsNA() ? '-' : fmtN(perf.donors.newN), donorsNA() ? '' : t('shareOfDonors')(fmtP(perf.donors.newShare))),
+    kpiPlain(t('retDonors'), donorsNA() ? '-' : fmtN(perf.donors.retN), donorsNA() ? '' : t('shareOfDonors')(fmtP(perf.donors.newShare == null ? null : 1 - perf.donors.newShare))),
     gl('paid'), gl('organic'), gl('wa'),
     kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost', MT.cpl),
     kpiPlain('nCAC', fmtC(perf.donors.nCAC), t('ncacNote')),
