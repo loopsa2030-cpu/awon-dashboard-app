@@ -138,18 +138,39 @@ async function odooPart(to) {
   };
 }
 
+// Ad data: past days don't change, so after the first full load only the last ADS_WINDOW_DAYS are asked for,
+// at most once an hour, and merged into the saved rows. This keeps Supermetrics row usage small.
+const ADS_EVERY = 60 * 60 * 1000, ADS_WINDOW_DAYS = 7;
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+function platformsFrom(camps) {
+  const out = {};
+  for (const [p, rows] of Object.entries(camps)) {
+    const byDate = new Map();
+    for (const [d, , lg, sp, ld] of rows || []) { const a = byDate.get(d) || [d, 0, 0, 0]; if (lg) { a[1] += sp; a[3] += ld; } else a[2] += sp; byDate.set(d, a); }
+    out[p] = [...byDate.values()].sort((x, y) => (x[0] < y[0] ? -1 : 1)).map(a => [a[0], r2(a[1]), r2(a[2]), Math.round(a[3])]);
+  }
+  return out;
+}
 async function adsPart(to, previous) {
   if (!ads.configured()) return { platforms: {}, camps: {}, ga: [], meta: { mode: 'not configured', errors: ['SUPERMETRICS_API_KEY is not set.'] } };
-  const r = await ads.load(FIRST_MONTH + '-01', to);
-  const platforms = {}, camps = {};
+  const prev = previous && previous.camps && Object.values(previous.camps).some(v => v && v.length) ? previous : null;
+  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < ADS_EVERY)
+    return { platforms: prev.platforms, camps: prev.camps, ga: prev.ga || [], fetchedAt: prev.fetchedAt, meta: { mode: 'live', errors: prev.errors || [] } };
+  const from = prev ? addDays(to, -ADS_WINDOW_DAYS) : FIRST_MONTH + '-01';
+  const r = await ads.load(from, to);
   const errors = [...(r.errors || [])];
-  for (const p of Object.keys(r.platforms)) {
-    const failed = !r.platforms[p].length && previous && previous.platforms && previous.platforms[p] && previous.platforms[p].length;
-    platforms[p] = failed ? previous.platforms[p] : r.platforms[p];     // keep last good data if a platform fails
-    camps[p] = failed && previous.camps ? previous.camps[p] || [] : r.camps[p];
+  const failed = k => errors.some(e => e.startsWith(k + ':'));
+  const camps = {};
+  for (const p of Object.keys(ads.PLATFORMS)) {
+    const fresh = (r.camps && r.camps[p]) || [];
+    const old = (prev && prev.camps && prev.camps[p]) || [];
+    if (failed(p) && !fresh.length) camps[p] = old;                       // keep the saved rows if this platform failed
+    else camps[p] = [...old.filter(x => x[0] < from), ...fresh];
   }
-  const ga = r.ga.length ? r.ga : (previous && previous.ga) || [];
-  return { platforms, camps, ga, meta: { mode: 'live', errors } };
+  const oldGa = (prev && prev.ga) || [];
+  const ga = failed('GA4') && !(r.ga || []).length ? oldGa : [...oldGa.filter(x => x[0] < from), ...(r.ga || [])];
+  if (errors.length) console.error('ads: ' + errors.join(' | '));
+  return { platforms: platformsFrom(camps), camps, ga, fetchedAt: Date.now(), meta: { mode: 'live', errors, window: from } };
 }
 
 // Never replace a complete donor split with one built without the history sheet
@@ -168,11 +189,11 @@ async function build() {
     timed('sheets', sheetsPart(to)),
     timed('wa', withTimeout(wadata.load(), 60000, 'WhatsApp report')).catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     timed('odoo', withTimeout(odooPart(to), 200000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
-    timed('ads', withTimeout(adsPart(to, cached && cached.ads), 150000, 'Supermetrics')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
+    timed('ads', withTimeout(adsPart(to, cached && cached.ads), 150000, 'Supermetrics')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], fetchedAt: cached.ads.fetchedAt, meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
   ]);
   const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
-    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [] },
+    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, errors: (ad.meta && ad.meta.errors) || [] },
     waReport: { rows: wa.rows },
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],
