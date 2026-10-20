@@ -549,8 +549,6 @@ function render({ ds, from, to, lang, perf }) {
     return `<td style="background:${r < 0 ? `rgba(12,163,157,${(0.06 + a * 0.5).toFixed(2)})` : `rgba(181,78,55,${(0.05 + a * 0.4).toFixed(2)})`}">${num(fC(v))}<span class="sub">${num(fN(x.crm))}</span></td>`; };
 
   root.innerHTML = `${srcWarn(ds)}
-  <section><div class="sec-h"><h2>${t('insights')}</h2><p>${esc(t('insightsSub')(n, `${pFrom} → ${pTo}`))}</p></div><div class="ins-grid">${insHtml}</div></section>
-
   <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(t('vsPrev'))}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
     <div class="kpis">
       ${kpi(t('spend'), fU(pt.spend), delta(pt.spend, pp.spend, 'neutral'))}
@@ -617,6 +615,8 @@ function render({ ds, from, to, lang, perf }) {
       </tbody></table></div></div>
     </div>
   </section>
+
+  <section><div class="sec-h"><h2>${t('insights')}</h2><p>${esc(t('insightsSub')(n, `${pFrom} → ${pTo}`))}</p></div><div class="ins-grid">${insHtml}</div></section>
   <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'].map(k => `<li>${esc(t(k))}</li>`).join('')}${(ds.notes || []).map(e => `<li>${esc(e)}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
 
   // --- charts
