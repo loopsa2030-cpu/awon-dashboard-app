@@ -159,4 +159,4 @@ async function load(from, to) {
 // Back-compat
 async function dailySpend(from, to) { return load(from, to); }
 
-module.exports = { load, dailySpend, configured, PLATFORMS, _isLeadgen: isLeadgen, _gaPlatform: gaPlatform };
+module.exports = { load, dailySpend, configured, PLATFORMS, gaAggregate, _isLeadgen: isLeadgen, _gaPlatform: gaPlatform };

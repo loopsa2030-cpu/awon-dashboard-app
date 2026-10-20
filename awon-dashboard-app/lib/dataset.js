@@ -4,6 +4,7 @@ const { loadMonths, FIRST_MONTH } = require('./sheetsdata');
 const odoo = require('./odoo');
 const { cityKey } = require('./cities');
 const ads = require('./ads');
+const windsor = require('./windsor');
 const history = require('./history');
 const wadata = require('./wadata');
 const snapshot = require('./snapshot');
@@ -151,13 +152,39 @@ function platformsFrom(camps) {
   }
   return out;
 }
+// Provider: Windsor.ai when WINDSOR_API_KEY is set (ADS_PROVIDER=supermetrics switches back), otherwise Supermetrics.
+function provider() {
+  if (process.env.ADS_PROVIDER === 'supermetrics') return { name: 'supermetrics', mod: ads };
+  if (windsor.configured()) return { name: 'windsor', mod: windsor };
+  return { name: 'supermetrics', mod: ads };
+}
+// Log line comparing two sets of rows on the days both have (counts and sums only)
+function compareLog(label, a, b) {
+  try {
+    const out = {};
+    for (const p of Object.keys(ads.PLATFORMS)) {
+      const A = (a.camps[p] || []), B = (b.camps[p] || []);
+      const days = new Set(A.map(x => x[0])); const both = new Set(B.map(x => x[0]).filter(d => days.has(d)));
+      const sum = (rows, i) => r2(rows.filter(x => both.has(x[0])).reduce((t, x) => t + (Number(x[i]) || 0), 0));
+      out[p] = { days: both.size, spend: [sum(A, 3), sum(B, 3)], native: [sum(A, 4), sum(B, 4)], clicks: [sum(A, 5), sum(B, 5)] };
+    }
+    const gd = new Set((a.ga || []).map(x => x[0])); const gboth = new Set((b.ga || []).map(x => x[0]).filter(d => gd.has(d)));
+    const gs = rows => (rows || []).filter(x => gboth.has(x[0])).reduce((t, x) => t + x[4], 0);
+    out.ga4 = { days: gboth.size, sessions: [gs(a.ga), gs(b.ga)] };
+    console.log(label + ' ' + JSON.stringify(out));
+  } catch (e) { console.error('compare failed', e.message); }
+}
 async function adsPart(to, previous) {
-  if (!ads.configured()) return { platforms: {}, camps: {}, ga: [], meta: { mode: 'not configured', errors: ['SUPERMETRICS_API_KEY is not set.'] } };
-  const prev = previous && previous.camps && Object.values(previous.camps).some(v => v && v.length) ? previous : null;
-  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < ADS_EVERY)
-    return { platforms: prev.platforms, camps: prev.camps, ga: prev.ga || [], fetchedAt: prev.fetchedAt, meta: { mode: 'live', errors: prev.errors || [] } };
-  const from = prev ? addDays(to, -ADS_WINDOW_DAYS) : FIRST_MONTH + '-01';
-  const r = await ads.load(from, to);
+  const pv = provider();
+  if (!pv.mod.configured()) return { platforms: {}, camps: {}, ga: [], meta: { mode: 'not configured', errors: [pv.name + ' is not configured.'] } };
+  let prev = previous && previous.camps && Object.values(previous.camps).some(v => v && v.length) ? previous : null;
+  const switching = prev && (prev.source || 'supermetrics') !== pv.name;
+  if (prev && !switching && prev.fetchedAt && Date.now() - prev.fetchedAt < ADS_EVERY)
+    return { platforms: prev.platforms, camps: prev.camps, ga: prev.ga || [], fetchedAt: prev.fetchedAt, source: prev.source, meta: { mode: 'live', errors: prev.errors || [] } };
+  // First run on a new provider: load the full history from it, compare with what the old provider gave, then use it
+  const from = prev && !switching ? addDays(to, -ADS_WINDOW_DAYS) : FIRST_MONTH + '-01';
+  const r = await pv.mod.load(from, to);
+  if (switching) { compareLog('ads compare ' + pv.name + ' vs ' + (prev.source || 'supermetrics') + ' [new, old]', r, prev); }
   const errors = [...(r.errors || [])];
   const failed = k => errors.some(e => e.startsWith(k + ':'));
   const camps = {};
@@ -170,7 +197,7 @@ async function adsPart(to, previous) {
   const oldGa = (prev && prev.ga) || [];
   const ga = failed('GA4') && !(r.ga || []).length ? oldGa : [...oldGa.filter(x => x[0] < from), ...(r.ga || [])];
   if (errors.length) console.error('ads: ' + errors.join(' | '));
-  return { platforms: platformsFrom(camps), camps, ga, fetchedAt: Date.now(), meta: { mode: 'live', errors, window: from } };
+  return { platforms: platformsFrom(camps), camps, ga, fetchedAt: Date.now(), source: pv.name, meta: { mode: 'live', errors, window: from } };
 }
 
 // Never replace a complete donor split with one built without the history sheet
@@ -189,11 +216,11 @@ async function build() {
     timed('sheets', sheetsPart(to)),
     timed('wa', withTimeout(wadata.load(), 60000, 'WhatsApp report')).catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     timed('odoo', withTimeout(odooPart(to), 200000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
-    timed('ads', withTimeout(adsPart(to, cached && cached.ads), 150000, 'Supermetrics')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], fetchedAt: cached.ads.fetchedAt, meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
+    timed('ads', withTimeout(adsPart(to, cached && cached.ads), 240000, 'Ad data')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], fetchedAt: cached.ads.fetchedAt, source: cached.ads.source, meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
   ]);
   const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
-    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, errors: (ad.meta && ad.meta.errors) || [] },
+    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
     waReport: { rows: wa.rows },
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],
