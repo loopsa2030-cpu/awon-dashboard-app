@@ -152,12 +152,9 @@ function platformsFrom(camps) {
   }
   return out;
 }
-// Provider: Windsor.ai when WINDSOR_API_KEY is set (ADS_PROVIDER=supermetrics switches back), otherwise Supermetrics.
-function provider() {
-  if (process.env.ADS_PROVIDER === 'supermetrics') return { name: 'supermetrics', mod: ads };
-  if (windsor.configured()) return { name: 'windsor', mod: windsor };
-  return { name: 'supermetrics', mod: ads };
-}
+// Provider: Windsor.ai only (Supermetrics was dropped on 20 Oct 2026; lib/ads.js now only supplies the shared
+// campaign classification and GA4 grouping helpers).
+function provider() { return { name: 'windsor', mod: windsor }; }
 // Log line comparing two sets of rows on the days both have (counts and sums only)
 function compareLog(label, a, b) {
   try {
