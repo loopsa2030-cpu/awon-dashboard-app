@@ -215,7 +215,7 @@ function startBuild(waitUntil) {
       if (waitUntil) waitUntil(p);
     }
     return d;
-  }).finally(() => { building = null; });
+  }).catch(e => { console.error('dataset build failed: ' + e.message); throw e; }).finally(() => { building = null; });
   return building;
 }
 async function get({ waitUntil } = {}) {

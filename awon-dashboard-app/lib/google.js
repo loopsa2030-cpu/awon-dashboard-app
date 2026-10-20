@@ -1,13 +1,14 @@
 // Reads the two Drive workbooks with a service account (env GOOGLE_SERVICE_ACCOUNT_JSON).
-// The MTD file is an .xlsx stored in Drive (downloaded as-is); the Forecast file is a native
-// Google Sheet (exported to .xlsx). Both are parsed with SheetJS, only the tabs we need.
+// The MTD, Forecast and WhatsApp report files are native Google Sheets (exported to .xlsx). Both are parsed with SheetJS, only the tabs we need.
 const { GoogleAuth } = require('google-auth-library');
 const XLSX = require('xlsx');
 
-const MTD_FILE_ID = process.env.MTD_FILE_ID || '16U3UFk7Igj6k_j8kOThXWf605jLxjduX';
+// Since 20 Oct 2026 the MTD workbook is a native Google Sheet (the old .xlsx is no longer updated).
+// MTD_SHEET_ID overrides it; the old MTD_FILE_ID variable is ignored on purpose so it can't point back at the .xlsx.
+const MTD_FILE_ID = process.env.MTD_SHEET_ID || '1so4WswZoP5de2INhI2MXKAy-6ZXxh6FBV4AZ8xQdPt0';
 const FORECAST_FILE_ID = process.env.FORECAST_FILE_ID || '1ixZTANNh4jxGUXckOJT0exK2oAkPfV22SNoB02FVAMk';
 const WA_FILE_ID = process.env.WA_FILE_ID || '16KwEToBq_DQQruotaZI6mDN1YUWLHX8szULo1IddmLc';   // Awon WA - Performance Report (native Google Sheet)
-const FILES = { mtd: [MTD_FILE_ID, false], forecast: [FORECAST_FILE_ID, true], wa: [WA_FILE_ID, true] };   // [id, export as xlsx]
+const FILES = { mtd: [MTD_FILE_ID, true], forecast: [FORECAST_FILE_ID, true], wa: [WA_FILE_ID, true] };   // [id, export as xlsx]
 const TTL = 10 * 60 * 1000;
 const cache = new Map();
 
