@@ -191,7 +191,12 @@
       const b0 = Date.parse(ds.donors.base + 'T00:00:00Z');
       const f = Math.round((Date.parse(from + 'T00:00:00Z') - b0) / 864e5), t = Math.round((Date.parse(to + 'T00:00:00Z') - b0) / 864e5);
       const seen = new Map();
-      for (const [d, pid, fd] of ds.donors.rows) if (d >= f && d <= t && !seen.has(pid)) seen.set(pid, fd);
+      donors.newPk = donors.newKg = donors.retPk = donors.retKg = 0;
+      donors.pkKnown = !ds.donors.rows.length || ds.donors.rows[0].length > 3;   // older saved data has no weight per order
+      for (const [d, pid, fd, kg] of ds.donors.rows) if (d >= f && d <= t) {
+        if (!seen.has(pid)) seen.set(pid, fd);
+        if (fd >= f) { donors.newPk++; donors.newKg += kg || 0; } else { donors.retPk++; donors.retKg += kg || 0; }
+      }
       for (const fd of seen.values()) { if (fd >= f) donors.newN++; else donors.retN++; }
     }
 
@@ -199,6 +204,7 @@
     donors.nCAC = div(groups.paid.spend + groups.organic.spend, donors.newN);
     donors.rCAC = div(groups.wa.spend, donors.retN);      // WhatsApp messages spend (WA "Spent" in the Daily tab)
     donors.newShare = div(donors.newN, donors.newN + donors.retN);
+    donors.newKgShare = div(donors.newKg, donors.newKg + donors.retKg);
     for (const [d, byCity] of Object.entries(dayCityKg)) {
       const s = series[d]; if (!s) continue;
       for (const [city, kg] of Object.entries(byCity)) {

@@ -43,7 +43,7 @@ const T = {
     favNote: f => `Source groups follow the Odoo favourites: ${f}.`,
     unassignedNote: f => `Sources not in any favourite (grouped by name rules until added in Odoo): ${f}.`,
     donorNote: n => `New donor = first-ever received donation (Odoo Won + Received, plus ${n} phones from the old customer data), matched by phone. Returning = donated before the period. Counts are unique people. rCAC uses WhatsApp spend from the Daily tab.`,
-    newDonors: 'New donors', retDonors: 'Returning donors', shareOfDonors: p => `${p} of donors`,
+    newDonors: 'New donors', retDonors: 'Returning donors', newPk: 'New donors: pickups', newKg: 'New donors: weight', retPk: 'Returning donors: pickups', retKg: 'Returning donors: weight', shareOfPickups: p => `${p} of pickups`, shareOfKg: p => `${p} of weight`, pkNote: 'Pickups and kg from Odoo orders (Won + Received), split by whether the donor had donated before the period.', shareOfDonors: p => `${p} of donors`,
     ncacNote: 'Paid + Organic spend per new donor', rcacNote: 'WhatsApp messages spend per returning donor',
     charts: 'Trends and cohorts', cGroupCpk: 'Cost per kg by source group (7-day rolling)', cCumKg: 'Cumulative kg vs target', cCityKg: 'kg by city vs target',
     cDonors: 'New vs returning donors by month', cCohort: 'Repeat donation by first-donation month (share of each cohort donating again)', kgActual: 'Actual kg', kgTarget: 'Target kg',
@@ -101,7 +101,7 @@ const T = {
     favNote: f => `مجموعات المصادر تتبع المفضلة في Odoo: ${f}.`,
     unassignedNote: f => `مصادر غير مدرجة في أي مفضلة (تُصنف بالاسم حتى تُضاف في Odoo): ${f}.`,
     donorNote: n => `المتبرع الجديد = أول تبرع مستلم على الإطلاق (Odoo ناجح ومستلم، إضافة إلى ${n} رقماً من بيانات العملاء القديمة) مطابقةً برقم الجوال. العائد = تبرع قبل الفترة. الأعداد أشخاص فريدون. rCAC يستخدم إنفاق واتساب من التبويب اليومي.`,
-    newDonors: 'متبرعون جدد', retDonors: 'متبرعون عائدون', shareOfDonors: p => `${p} من المتبرعين`,
+    newDonors: 'متبرعون جدد', retDonors: 'متبرعون عائدون', newPk: 'المتبرعون الجدد: الاستلامات', newKg: 'المتبرعون الجدد: الوزن', retPk: 'المتبرعون العائدون: الاستلامات', retKg: 'المتبرعون العائدون: الوزن', shareOfPickups: p => `${p} من الاستلامات`, shareOfKg: p => `${p} من الوزن`, pkNote: 'الاستلامات والكيلوغرامات من طلبات أودو (مكتمل + مستلم)، مقسمة حسب ما إذا كان المتبرع قد تبرع قبل الفترة.', shareOfDonors: p => `${p} من المتبرعين`,
     ncacNote: 'إنفاق المدفوع والعضوي لكل متبرع جديد', rcacNote: 'إنفاق رسائل واتساب لكل متبرع عائد',
     charts: 'الاتجاهات والمجموعات', cGroupCpk: 'تكلفة الكيلو حسب مجموعة المصدر (متوسط ٧ أيام)', cCumKg: 'الكيلو التراكمي مقابل المستهدف', cCityKg: 'الكيلو حسب المدينة مقابل المستهدف',
     cDonors: 'المتبرعون الجدد والعائدون شهرياً', cCohort: 'تكرار التبرع حسب شهر أول تبرع', kgActual: 'الكيلو الفعلي', kgTarget: 'الكيلو المستهدف',
@@ -351,6 +351,16 @@ function renderPerf() {
     kpi(t('pickupRate'), T0.pickupRate, T0.pickupRateT, fmtP, 'volume', MT.pickupRate, pc(p => p.totals.pickupRate)),
     kpi(t('kgPerPickup'), T0.kgPerPickup, T0.kgPerPickupT, v => fmtN(v, 1), 'volume', MT.kgPerPickup, pc(p => p.totals.kgPerPickup)),
     kpi(t('cac'), T0.cac, T0.cacT, fmtC, 'cost', MT.cac, pc(p => p.totals.cac)),
+    ...(() => {
+      const ok = !dna && D0.pkKnown !== false, kgU = ' ' + (lang === 'ar' ? 'كغ' : 'kg'), cc = DC && DC.pkKnown !== false ? DC : null;
+      const sh = (a, b) => (a + b) ? a / (a + b) : null;
+      return [
+        kpiPlain(t('newPk'), ok ? fmtN(D0.newPk) : '-', ok ? t('shareOfPickups')(fmtP(sh(D0.newPk, D0.retPk))) : '', ok && cc ? D0.newPk : undefined, cc && cc.newPk, 'volume'),
+        kpiPlain(t('newKg'), ok ? fmtN(D0.newKg) + kgU : '-', ok ? t('shareOfKg')(fmtP(sh(D0.newKg, D0.retKg))) : '', ok && cc ? D0.newKg : undefined, cc && cc.newKg, 'volume'),
+        kpiPlain(t('retPk'), ok ? fmtN(D0.retPk) : '-', ok ? t('shareOfPickups')(fmtP(sh(D0.retPk, D0.newPk))) : '', ok && cc ? D0.retPk : undefined, cc && cc.retPk, 'volume'),
+        kpiPlain(t('retKg'), ok ? fmtN(D0.retKg) + kgU : '-', ok ? t('shareOfKg')(fmtP(sh(D0.retKg, D0.newKg))) : '', ok && cc ? D0.retKg : undefined, cc && cc.retKg, 'volume'),
+      ];
+    })(),
   ].join('');
 
   // cities
@@ -391,6 +401,7 @@ function renderPerf() {
     t('overheadNote'), t('brandingNote'), t('waPaidNote'),
     ...(src.odoo.favourites && src.odoo.favourites.length ? [t('favNote')(src.odoo.favourites.join(', '))] : []),
     ...(src.odoo.unassigned && src.odoo.unassigned.length ? [t('unassignedNote')(src.odoo.unassigned.join(', '))] : []),
+    t('pkNote'),
     t('donorNote')(fmtN((dataset && dataset.donors && dataset.donors.historyPhones) || 0)),
     ...(dataset && dataset.donors && dataset.donors.note ? [dataset.donors.note] : []),
     ...(perf.notes || []), ...((src.ads.errors) || []),
