@@ -74,7 +74,7 @@ async function odooPart(to) {
     odoo.readGroup('crm.lead', [...odoo.SCOPE, ...odoo.ksaRange('create_date', FIRST_MONTH + '-01', to)],
       ['total_weight:sum'], ['create_date:day', 'state_id', 'source_id', 'stage_id']),
     odoo.call('crm.lead', 'search_read', [[...odoo.SCOPE, ['stage_id.is_won', '=', true], ['delivery_status', '=', '6']]],
-      { fields: ['phone', 'create_date', 'date_closed'] }),
+      { fields: ['phone', 'create_date', 'date_closed', 'total_weight'] }),
   ]);
 
   const agg = new Map();
@@ -116,12 +116,12 @@ async function odooPart(to) {
     if (!ph || !when) continue;
     const date = new Date(new Date(when + 'Z').getTime() + 3 * 3600e3).toISOString().slice(0, 10);
     const cur = firstSeen.get(ph); if (!cur || date < cur) firstSeen.set(ph, date);
-    if (date >= FIRST_MONTH + '-01') orders.push([date, ph]);
+    if (date >= FIRST_MONTH + '-01') orders.push([date, ph, r2(o.total_weight || 0)]);
   }
   const idx = new Map(); const donorRows = [];
-  for (const [date, ph] of orders) {
+  for (const [date, ph, kg] of orders) {
     if (!idx.has(ph)) idx.set(ph, idx.size);
-    donorRows.push([dayIdx(date), idx.get(ph), dayIdx(firstSeen.get(ph))]);
+    donorRows.push([dayIdx(date), idx.get(ph), dayIdx(firstSeen.get(ph)), kg]);
   }
   // Check line in the logs (counts only): this month's new vs returning, with the history sheet and with Odoo alone
   try {
