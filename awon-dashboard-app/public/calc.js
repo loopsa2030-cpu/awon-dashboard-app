@@ -218,5 +218,28 @@
       series: seriesList, notes, generatedAt: ds.generatedAt,
     };
   }
-  return { compute };
+  // Comparison window for a selected range [from, end] (end = last complete/reported day).
+  // 'prev' = the same number of days just before; 'month' = the same calendar days one month earlier
+  // (a whole month compares with the whole previous month). Returns null when off or before the data starts.
+  function shiftMonth(iso, n) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const t = new Date(Date.UTC(y, m - 1 + n, 1));
+    t.setUTCDate(Math.min(d, dim(t.toISOString().slice(0, 7))));
+    return t.toISOString().slice(0, 10);
+  }
+  function cmpRange(mode, from, end, first) {
+    if (!mode || mode === 'off' || !from || !end || end < from) return null;
+    let a, b;
+    if (mode === 'month') {
+      a = shiftMonth(from, -1); b = shiftMonth(end, -1);
+      if (+end.slice(8) === dim(end.slice(0, 7))) b = b.slice(0, 8) + String(dim(b.slice(0, 7))).padStart(2, '0');   // month end maps to month end
+    } else {
+      const n = eachDay(from, end).length;
+      a = addDays(from, -n); b = addDays(from, -1);
+    }
+    if (first && b < first) return null;
+    if (first && a < first) a = first;
+    return { from: a, to: b };
+  }
+  return { compute, cmpRange };
 });

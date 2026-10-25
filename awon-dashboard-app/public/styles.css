@@ -270,3 +270,20 @@ table.grp .gs{border-inline-start:1px solid var(--line)}
 .mk-warn{background:rgba(237,167,55,.14);border:1px solid rgba(237,167,55,.45);color:#7a520c;border-radius:10px;padding:10px 14px;margin:0 0 12px;font-size:13px;line-height:1.5}
 .muted{color:var(--muted);font-size:13px}
 .kpi .t .dl{white-space:nowrap}
+
+.cmp-sel{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--muted);margin-inline-start:6px}
+.cmp-sel select{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 12px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}
+.kpi .t.cmp{margin-top:5px;padding-top:6px;border-top:1px dashed var(--line)}
+.dl.warn{color:#a8700f}
+td .dl{white-space:nowrap}
+.sg .v .t .dl{display:inline}
+.hl .t.cmp{margin-top:2px}
+.hl.main .dl,.hl.teal .dl{display:inline-block;padding:1px 8px;border-radius:99px;background:rgba(255,255,255,.18);color:#fff}
+.hl.main .dl.good,.hl.teal .dl.good{background:rgba(233,253,251,.28)}
+.hl.main .dl.bad,.hl.teal .dl.bad{background:rgba(181,78,55,.55)}
+.hl .dl{display:inline}
+.kpi .tgt-line b{color:var(--ink);font-weight:600}
+@media (max-width:720px){.cmp-sel{margin-inline-start:0}}
+.sg .v .dl .num,.hl .dl .num{font:inherit}
+.sg .v .t .dl{font:500 12.5px var(--display)}
+.map-stats .t.cmp{font-size:11.5px;flex-wrap:wrap}

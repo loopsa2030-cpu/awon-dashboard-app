@@ -6,7 +6,7 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 // ---------------- strings ----------------
 const T = {
   en: {
-    insights: 'What changed and what to do', insightsSub: (a, b) => `Selected period compared with the ${a} days before it (${b})`,
+    insights: 'What changed and what to do', insightsSub: (a, b) => `Selected period compared with ${b}`,
     noInsights: 'No big moves against the previous period. Keep budgets steady and keep testing creatives.',
     paid: 'Paid ads', organic: 'Organic', wa: 'WhatsApp & CRM', cities: 'Cities (daily sheet view)', daily: 'Daily sheet',
     cohorts: 'Weekly cohorts and breakdowns',
@@ -29,10 +29,11 @@ const T = {
     n3: 'Website visits are GA4 sessions. GA4 has no city data for this site, so paid visits get their city from the campaign name and organic visits have no city.',
     n4: 'Organic CPL: Meta, TikTok and Snapchat use the branding spend on that platform; website organic uses the organic budget from the Daily tab; partners and PR have no direct spend.',
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
-    n6: 'Insights compare the selected period with the same number of days just before it, and ignore sources with too little volume to judge.',
+    n6: 'Changes (▲▼) and insights compare the selected period with the period chosen in "Compare to" (the same number of days just before it, or the same days last month), and ignore sources with too little volume to judge.',
+    n8: 'Spend and lead targets come from the Forecast tab: each city\'s monthly target for the group spread evenly over the days of the month. Spend targets are the direct media budget (no marketing overhead).',
     n7: 'WhatsApp campaign numbers (sent, delivered, seen, leads, spend) come from the Awon WA Performance Report sheet. Rates: delivered / sent, seen / delivered, leads / delivered.',
     inOdoo: 'In Odoo now:',
-    tgtTD: 'Leads target to date', tgtMonth: 'Month target', tgtCpl: 'Target', tgtLine: 'Daily target', achieved: 'achieved', dayTotal: 'Total',
+    tgtTD: 'Target to date', tgtMonth: 'Month target', vsR: r => `vs ${r}`, tgtCpl: 'Target', tgtLine: 'Daily target', achieved: 'achieved', dayTotal: 'Total',
     srcOdoo: 'CRM leads from Odoo did not load', srcAds: 'Ad platform and GA4 data did not load', srcRetry: 'The server retries every minute; click Refresh in a minute or two.',
     waRep: 'WhatsApp campaigns', waRepSub: 'From the WA Performance Report sheet', waRepNone: 'No rows filled in the WA Performance Report for this period yet.',
     sent: 'Sent', delivered: 'Delivered', seen: 'Seen', repLeads: 'Leads (report)', repSpend: 'Spend (report)', repCpl: 'CPL (report)',
@@ -61,7 +62,7 @@ const T = {
     aShift: (a, b) => `Shift 10 to 20% of ${b} budget to ${a} and review after 3 days.`,
   },
   ar: {
-    insights: 'ما الذي تغيّر وماذا نفعل', insightsSub: (a, b) => `الفترة المحددة مقارنة بالـ ${a} يوماً السابقة لها (${b})`,
+    insights: 'ما الذي تغيّر وماذا نفعل', insightsSub: (a, b) => `الفترة المحددة مقارنة بـ ${b}`,
     noInsights: 'لا تغيرات كبيرة مقارنة بالفترة السابقة. حافظوا على الميزانيات واستمروا في اختبار الإعلانات.',
     paid: 'الإعلانات المدفوعة', organic: 'العضوي', wa: 'واتساب وإعادة التفعيل', cities: 'المدن (عرض الشيت اليومي)', daily: 'الشيت اليومي',
     cohorts: 'المجموعات الأسبوعية والتقسيمات',
@@ -84,10 +85,11 @@ const T = {
     n3: 'زيارات الموقع هي جلسات GA4. لا توجد بيانات مدن في GA4 لهذا الموقع، لذلك المدينة للزيارات المدفوعة من اسم الحملة والزيارات العضوية بلا مدينة.',
     n4: 'تكلفة العميل العضوي: ميتا وتيك توك وسناب تستخدم إنفاق العلامة على المنصة نفسها؛ الموقع يستخدم ميزانية العضوي من التبويب اليومي؛ الشركاء والعلاقات العامة بلا إنفاق مباشر.',
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
-    n6: 'الملاحظات تقارن الفترة المحددة بنفس عدد الأيام قبلها مباشرة، وتتجاهل المصادر ذات الحجم القليل.',
+    n6: 'التغيّرات (▲▼) والملاحظات تقارن الفترة المحددة بالفترة المختارة في "قارن مع" (نفس عدد الأيام قبلها مباشرة، أو نفس الأيام من الشهر السابق)، وتتجاهل المصادر ذات الحجم القليل.',
+    n8: 'مستهدفات الإنفاق والعملاء من تبويب التوقعات: المستهدف الشهري لكل مدينة موزع بالتساوي على أيام الشهر. مستهدف الإنفاق هو ميزانية الإعلانات المباشرة (بدون المصاريف التسويقية العامة).',
     n7: 'أرقام حملات واتساب (المرسلة، المستلمة، المقروءة، العملاء، الإنفاق) من شيت تقرير أداء واتساب. النسب: المستلمة / المرسلة، المقروءة / المستلمة، العملاء / المستلمة.',
     inOdoo: 'في Odoo الآن:',
-    tgtTD: 'مستهدف العملاء حتى تاريخه', tgtMonth: 'مستهدف الشهر', tgtCpl: 'المستهدف', tgtLine: 'المستهدف اليومي', achieved: 'محقق', dayTotal: 'الإجمالي',
+    tgtTD: 'المستهدف حتى تاريخه', tgtMonth: 'مستهدف الشهر', vsR: r => `مقارنة بـ ${r}`, tgtCpl: 'المستهدف', tgtLine: 'المستهدف اليومي', achieved: 'محقق', dayTotal: 'الإجمالي',
     srcOdoo: 'لم يتم تحميل عملاء CRM من Odoo', srcAds: 'لم يتم تحميل بيانات المنصات الإعلانية وGA4', srcRetry: 'يعيد الخادم المحاولة كل دقيقة؛ اضغط تحديث بعد دقيقة أو دقيقتين.',
     waRep: 'حملات واتساب', waRepSub: 'من شيت تقرير أداء واتساب', waRepNone: 'لا توجد بيانات مدخلة في تقرير أداء واتساب لهذه الفترة بعد.',
     sent: 'المرسلة', delivered: 'المستلمة', seen: 'المقروءة', repLeads: 'العملاء (التقرير)', repSpend: 'الإنفاق (التقرير)', repCpl: 'تكلفة العميل (التقرير)',
@@ -146,7 +148,9 @@ const days = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1;
 const cityName = k => (CITY[k] ? CITY[k][L === 'ar' ? 1 : 0] : k ? k : t('national'));
 const pName = p => (p === 'wa' ? t('waSrc') : p === 'untagged' ? t('untagged') : t(p));
 // change badge; good = direction that is good for this metric ('up' or 'down')
+let CMP_ON = true;
 function delta(cur, prev, good = 'up', minBase = 0) {
+  if (!CMP_ON) return '';
   if (cur == null || prev == null || !isFinite(cur) || !isFinite(prev) || !prev || Math.abs(prev) < minBase) return '';
   const r = cur / prev - 1; if (Math.abs(r) < 0.005) return `<span class="dl flat">${num('0%')}</span>`;
   const isGood = (r > 0) === (good === 'up');
@@ -372,23 +376,31 @@ function weekStart(iso) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d
 const GRP = ['paid', 'organic', 'wa'];
 const dimOf = mk => new Date(Date.UTC(+mk.slice(0, 4), +mk.slice(5, 7), 0)).getUTCDate();
 function targets(ds, from, to) {
-  const T = { day: {}, sum: { paid: 0, organic: 0, wa: 0 }, month: { paid: 0, organic: 0, wa: 0 }, budget: { paid: 0, organic: 0, wa: 0 }, mLeads: { paid: 0, organic: 0, wa: 0 }, has: false };
+  const T = { day: {}, sum: { paid: 0, organic: 0, wa: 0 }, spend: { paid: 0, organic: 0, wa: 0 }, month: { paid: 0, organic: 0, wa: 0 }, budget: { paid: 0, organic: 0, wa: 0 }, mLeads: { paid: 0, organic: 0, wa: 0 }, has: false };
   const fc = mk => ds.months && ds.months[mk] && ds.months[mk].forecast;
   for (let d = from; d <= to; d = addD(d, 1)) {
     const f = fc(d.slice(0, 7)); if (!f) continue;
     const days = f.daysInMonth || dimOf(d.slice(0, 7)), x = T.day[d] = { paid: 0, organic: 0, wa: 0 };
-    for (const c of f.cities) for (const g of GRP) { const v = (c[g].leads || 0) / days; x[g] += v; T.sum[g] += v; }
+    for (const c of f.cities) for (const g of GRP) { const v = (c[g].leads || 0) / days; x[g] += v; T.sum[g] += v; T.spend[g] += (c[g].budget || 0) / days; }
     T.has = true;
   }
   const f = fc(to.slice(0, 7));
   if (f) for (const c of f.cities) for (const g of GRP) { T.month[g] += c[g].leads || 0; T.mLeads[g] += c[g].leads || 0; T.budget[g] += c[g].budget || 0; }
   return T;
 }
-// Leads vs target KPI: target to date, the month target, and how much of the target-to-date is achieved
-function tgtKpi(T, g, actual) {
-  if (!T.has || !T.sum[g]) return '';
-  const r = actual / T.sum[g], cls = r >= 1 ? 'good' : r >= 0.9 ? 'flat' : 'bad';
-  return kpi(t('tgtTD'), fN(T.sum[g]), `<span class="dl ${cls}">${num(fP(r, 0))} ${esc(t('achieved'))}</span>`, t('tgtMonth') + ' ' + fN(T.month[g]));
+// KPI card with its target inside: value, progress bar against the target to date, % achieved,
+// the month target and the change vs the comparison period. what = 'leads' | 'spend'
+function tgtCard(label, T, g, what, actual, d) {
+  const tg = what === 'spend' ? T.spend[g] : T.sum[g], mt = what === 'spend' ? T.budget[g] : T.month[g];
+  const fmt = what === 'spend' ? fU : fN;
+  if (!T.has || !tg) return kpi(label, fmt(actual), d);
+  const r = actual / tg;
+  // leads: more is better; spend: close to the budget is best
+  const st = what === 'spend' ? (Math.abs(r - 1) <= 0.1 ? 'good' : Math.abs(r - 1) <= 0.2 ? 'warn' : 'bad') : (r >= 0.98 ? 'good' : r >= 0.9 ? 'warn' : 'bad');
+  return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(fmt(actual))}</div>
+    <div class="bar"><i class="${st}" style="width:${Math.max(0, Math.min(100, r * 100))}%"></i></div>
+    <div class="t tgt-line"><span>${esc(t('tgtTD'))} <b>${num(fmt(tg))}</b></span><span class="dl ${st}">${num(fP(r, 0))} ${esc(t('achieved'))}</span></div>
+    <div class="t"><span>${esc(t('tgtMonth'))} ${num(fmt(mt))}</span>${d || ''}</div></div>`;
 }
 const tgtCplTxt = (T, g) => (T.mLeads[g] && T.budget[g] ? t('tgtCpl') + ' ' + fC(T.budget[g] / T.mLeads[g]) : '');
 // Chart.js plugin: writes the stacked total above each day's bar
@@ -439,7 +451,9 @@ function waReport(C, P) {
   return head + kp + tbl + `<div class="panel trend-panel" style="margin-top:14px"><div class="trend-cw"><canvas id="mkWaRep"></canvas></div></div>`;
 }
 
-function render({ ds, from, to, lang, perf }) {
+const fDay = d => new Intl.DateTimeFormat(L === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(d + 'T00:00:00Z')).replace('Sept', 'Sep');
+const fRange = (a, b) => a === b ? fDay(a) : a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${fDay(b)}` : `${fDay(a)} – ${fDay(b)}`;
+function render({ ds, from, to, lang, perf, cmp }) {
   L = lang === 'ar' ? 'ar' : 'en';
   const root = $('#mkt'); if (!root) return;
   if (!ds) { root.innerHTML = ''; return; }
@@ -450,7 +464,12 @@ function render({ ds, from, to, lang, perf }) {
   const lastRep = perf && perf.range && perf.range.lastReported;
   if (lastRep && lastRep < end && lastRep >= from) end = lastRep;
   const n = days(from, end);
-  const pFrom = addD(from, -n), pTo = addD(from, -1);
+  // comparison period from the "Compare to" control; insights still use the previous period when it's off
+  const mode = cmp || 'prev';
+  const cr = window.AwonCalc && AwonCalc.cmpRange ? AwonCalc.cmpRange(mode === 'off' ? 'prev' : mode, from, end, (ds.firstMonth || '2026-02') + '-01') : null;
+  CMP_ON = mode !== 'off' && !!cr;
+  const pFrom = cr ? cr.from : addD(from, -n), pTo = cr ? cr.to : addD(from, -1);
+  const vsTxt = CMP_ON ? t('vsR')(fRange(pFrom, pTo)) : '';
   const T = targets(ds, from, end);
   const C = aggregate(ds, from, end), P = aggregate(ds, pFrom, pTo);
   const pt = C.paidT, pp = P.paidT;
@@ -549,12 +568,11 @@ function render({ ds, from, to, lang, perf }) {
     return `<td style="background:${r < 0 ? `rgba(12,163,157,${(0.06 + a * 0.5).toFixed(2)})` : `rgba(181,78,55,${(0.05 + a * 0.4).toFixed(2)})`}">${num(fC(v))}<span class="sub">${num(fN(x.crm))}</span></td>`; };
 
   root.innerHTML = `${srcWarn(ds)}
-  <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(t('vsPrev'))}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
+  <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(vsTxt)}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
     <div class="kpis">
-      ${kpi(t('spend'), fU(pt.spend), delta(pt.spend, pp.spend, 'neutral'))}
-      ${kpi(t('crmLeads'), fN(pt.crm), delta(pt.crm, pp.crm, 'up', 5))}
+      ${tgtCard(t('spend'), T, 'paid', 'spend', pt.spend, delta(pt.spend, pp.spend, 'neutral'))}
+      ${tgtCard(t('crmLeads'), T, 'paid', 'leads', pt.crm, delta(pt.crm, pp.crm, 'up', 5))}
       ${kpi(t('nativeLeads'), fN(pt.native), delta(pt.native, pp.native, 'up', 5))}
-      ${tgtKpi(T, 'paid', pt.crm)}
       ${kpi(t('crmCpl'), fC(div(pt.spend, pt.crm)), delta(div(pt.spend, pt.crm), div(pp.spend, pp.crm), 'down'), tgtCplTxt(T, 'paid'))}
       ${kpi(t('nativeCpl'), fC(div(pt.spend, pt.native)), delta(div(pt.spend, pt.native), div(pp.spend, pp.native), 'down'))}
       ${kpi(t('paidVisits'), fN(pt.visits), delta(pt.visits, pp.visits))}
@@ -567,13 +585,12 @@ function render({ ds, from, to, lang, perf }) {
       <tbody>${pcRows}</tbody><tfoot><tr><td>${esc(t('total'))}</td><td>${num(fU(pcTot.spend))}</td><td>${num(fN(pcTot.crm))}</td><td>${num(fN(pcTot.native))}</td><td>${num(fC(div(pcTot.spend, pcTot.crm)))}</td><td>${num(fC(div(pcTot.spend, pcTot.native)))}</td><td>${num(fN(pcTot.visits))}</td><td>${num(fP(div(pcTot.crm, pcTot.visits), 2))}</td></tr></tfoot></table></div></div>
   </section>
 
-  <section><div class="sec-h"><h2>${t('organic')}</h2><p>${esc(t('vsPrev'))}</p></div>
+  <section><div class="sec-h"><h2>${t('organic')}</h2><p>${esc(vsTxt)}</p></div>
     <div class="kpis">
-      ${kpi(t('spend'), fU(ot.spend), delta(ot.spend, op.spend, 'neutral'))}
+      ${tgtCard(t('spend'), T, 'organic', 'spend', ot.spend, delta(ot.spend, op.spend, 'neutral'))}
       ${kpi(t('orgVisits'), fN(ot.visits), delta(ot.visits, op.visits))}
       ${kpi(t('cvr'), fP(div(ot.webLeads, ot.visits), 2), delta(div(ot.webLeads, ot.visits), div(op.webLeads, op.visits)))}
-      ${kpi(t('leads'), fN(ot.leads), delta(ot.leads, op.leads, 'up', 5))}
-      ${tgtKpi(T, 'organic', ot.leads)}
+      ${tgtCard(t('leads'), T, 'organic', 'leads', ot.leads, delta(ot.leads, op.leads, 'up', 5))}
       ${kpi(t('cpl'), fC(div(ot.spend, ot.leads)), delta(div(ot.spend, ot.leads), div(op.spend, op.leads), 'down'), tgtCplTxt(T, 'organic'))}
     </div>
     <div class="panel" style="margin-top:14px"><div class="tbl-wrap"><table class="mk"><thead><tr><th>${t('source')}</th><th>${t('leads')}</th><th>${t('share')}</th><th>${t('orgVisits')}</th><th>${t('cvr')}</th><th>${t('spend')}</th><th>${t('cpl')}</th></tr></thead>
@@ -581,11 +598,10 @@ function render({ ds, from, to, lang, perf }) {
     <div class="panel trend-panel" style="margin-top:14px">${chips('orgView', [['leads', t('vLeads')], ['visits', t('vVisits')]])}<div class="trend-cw"><canvas id="mkOrg"></canvas></div></div>
   </section>
 
-  <section><div class="sec-h"><h2>${t('wa')}</h2><p>${esc(t('vsPrev'))}</p></div>
+  <section><div class="sec-h"><h2>${t('wa')}</h2><p>${esc(vsTxt)}</p></div>
     <div class="kpis">
-      ${kpi(t('spend'), fU(C.wa.spend), delta(C.wa.spend, P.wa.spend, 'neutral'))}
-      ${kpi(t('crmLeads'), fN(C.wa.crm), delta(C.wa.crm, P.wa.crm, 'up', 5))}
-      ${tgtKpi(T, 'wa', C.wa.crm)}
+      ${tgtCard(t('spend'), T, 'wa', 'spend', C.wa.spend, delta(C.wa.spend, P.wa.spend, 'neutral'))}
+      ${tgtCard(t('crmLeads'), T, 'wa', 'leads', C.wa.crm, delta(C.wa.crm, P.wa.crm, 'up', 5))}
       ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'), tgtCplTxt(T, 'wa'))}
     </div>
     <div class="panel trend-panel" style="margin-top:14px"><div class="trend-cw"><canvas id="mkWa"></canvas></div></div>
@@ -617,7 +633,7 @@ function render({ ds, from, to, lang, perf }) {
   </section>
 
   <section><div class="sec-h"><h2>${t('insights')}</h2><p>${esc(t('insightsSub')(n, `${pFrom} → ${pTo}`))}</p></div><div class="ins-grid">${insHtml}</div></section>
-  <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7'].map(k => `<li>${esc(t(k))}</li>`).join('')}${(ds.notes || []).map(e => `<li>${esc(e)}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
+  <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8'].map(k => `<li>${esc(t(k))}</li>`).join('')}${(ds.notes || []).map(e => `<li>${esc(e)}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
 
   // --- charts
   const ds_ = Object.keys(C.days).filter(d => d >= from && d <= end).sort();

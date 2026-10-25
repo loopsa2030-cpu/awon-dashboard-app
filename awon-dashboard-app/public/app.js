@@ -17,6 +17,7 @@ const T = {
     title: 'Performance dashboard', subtitle: 'Marketing, logistics and donors across Saudi Arabia',
     refresh: 'Refresh', tabPerf: 'Performance', tabMkt: 'Marketing', tabMap: 'Donor map',
     all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', custom: 'Pick dates…',
+    cmpLbl: 'Compare to', cmpPrev: 'Previous period', cmpMonth: 'Same days last month', cmpOff: 'No comparison', vs: r => `vs ${r}`, cmpNone: 'no earlier data to compare',
     northStar: 'North star: cost per kg collected', perKg: 'per kg',
     marketing: 'Marketing', logistics: 'Logistics', vsTarget: 'Actual against the forecast, prorated to the last reported day',
     logiNote: 'Fridays are non-operating days in the target', platforms: 'Source groups',
@@ -74,6 +75,7 @@ const T = {
     title: 'لوحة الأداء', subtitle: 'التسويق واللوجستيات والمتبرعون في المملكة',
     refresh: 'تحديث', tabPerf: 'الأداء', tabMkt: 'التسويق', tabMap: 'خريطة المتبرعين',
     all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', custom: 'اختيار التواريخ…',
+    cmpLbl: 'قارن مع', cmpPrev: 'الفترة السابقة', cmpMonth: 'نفس الأيام من الشهر السابق', cmpOff: 'بدون مقارنة', vs: r => `مقارنة بـ ${r}`, cmpNone: 'لا توجد بيانات سابقة للمقارنة',
     northStar: 'المؤشر الأساسي: تكلفة الكيلوغرام المجمّع', perKg: 'لكل كغ',
     marketing: 'التسويق', logistics: 'اللوجستيات', vsTarget: 'الفعلي مقابل المستهدف حتى آخر يوم مُسجّل',
     logiNote: 'أيام الجمعة غير تشغيلية في المستهدف', platforms: 'مجموعات المصادر',
@@ -154,6 +156,21 @@ const todayKSA = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 
 const addD = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const FIRST = '2026-02-01';
 let state = JSON.parse(sessionStorage.getItem('awon-range') || 'null') || { preset: 'month' };
+// comparison: 'prev' (same length just before), 'month' (same days last month) or 'off'; remembered in this browser
+let cmpMode = (() => { try { return localStorage.getItem('awon-cmp') || 'prev'; } catch (e) { return 'prev'; } })();
+let cmpR = null, perfC = null, heatC = null;
+const fmtDay = d => new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(d + 'T00:00:00Z')).replace('Sept', 'Sep');
+const fmtRange = (a, b) => a === b ? fmtDay(a) : a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${fmtDay(b)}` : `${fmtDay(a)} – ${fmtDay(b)}`;
+const cmpShort = () => cmpR ? t('vs')(fmtRange(cmpR.from, cmpR.to)) : '';
+// change vs the comparison period; kind: 'volume' (up is good), 'cost' (down is good), anything else neutral
+function dchg(cur, prev, kind, minBase = 0) {
+  if (!cmpR || cur == null || prev == null || !isFinite(cur) || !isFinite(prev) || !prev || Math.abs(prev) < minBase) return '';
+  const r = cur / prev - 1;
+  if (Math.abs(r) < 0.005) return `<span class="dl flat">${num('0%')}</span>`;
+  const good = kind === 'cost' ? r < 0 : kind === 'volume' ? r > 0 : null;
+  return `<span class="dl ${good == null ? 'flat' : good ? 'good' : 'bad'}">${num((r > 0 ? '▲ ' : '▼ ') + fmtN(Math.abs(r) * 100, 0) + '%')}</span>`;
+}
+const cmpRow = (cur, prev, kind, minBase) => cmpR ? `<div class="t cmp"><span>${esc(cmpShort())}</span>${dchg(cur, prev, kind, minBase) || `<span class="dl flat">-</span>`}</div>` : '';
 function resolve(s) {
   const tdy = todayKSA();
   switch (s.preset) {
@@ -200,21 +217,36 @@ function recompute() {
   const { from, to } = resolve(state);
   $('#perfErr').innerHTML = dataErr ? `<div class="err">${esc(dataErr)}</div>` : '';
   perf = dataset && window.AwonCalc ? AwonCalc.compute(dataset, from, to) : null;
+  // the comparison covers as many days as are reported in the selected range
+  const lr = perf && perf.range.lastReported;
+  const cEnd = lr && lr >= from && lr < to ? lr : to;
+  cmpR = window.AwonCalc && AwonCalc.cmpRange ? AwonCalc.cmpRange(cmpMode, from, cEnd, FIRST) : null;
+  perfC = dataset && cmpR ? AwonCalc.compute(dataset, cmpR.from, cmpR.to) : null;
+  if (perfC && !perfC.range.lastReported) perfC = null;
   if (perf && !perf.range.lastReported && !dataErr) $('#perfErr').innerHTML = `<div class="err" style="color:var(--muted);background:#fff;border-color:var(--line)">${esc(lang === 'ar' ? 'لا توجد بيانات مسجلة لهذه الفترة بعد: يُحدَّث الشيت يومياً.' : 'Nothing reported for this period yet: the sheet is updated daily.')}</div>`;
-  const key = from + '|' + to;
-  heat = heatCache.get(key) || null;
+  syncHeat(false);
   render();
-  if (!heat && !$('#view-map').hidden) loadHeat(key, from, to);
+  if (!$('#view-map').hidden) ensureHeat();
 }
-async function loadHeat(key, from, to) {
+function syncHeat(draw) {
+  const { from, to } = resolve(state);
+  heat = heatCache.get(from + '|' + to) || null;
+  heatC = cmpR ? heatCache.get(cmpR.from + '|' + cmpR.to) || null : null;
+  if (draw) renderMap();
+}
+function ensureHeat() {
+  const r = resolve(state);
+  loadHeat(r.from + '|' + r.to, r.from, r.to, true);
+  if (cmpR) loadHeat(cmpR.from + '|' + cmpR.to, cmpR.from, cmpR.to, false);
+}
+async function loadHeat(key, from, to, main) {
   if (heatCache.has(key)) return;
   heatCache.set(key, null);
-  $('#mapNotes').innerHTML = `<li>${esc(lang === 'ar' ? 'جارٍ تحميل الخريطة…' : 'Loading map…')}</li>`;
+  if (main) $('#mapNotes').innerHTML = `<li>${esc(lang === 'ar' ? 'جارٍ تحميل الخريطة…' : 'Loading map…')}</li>`;
   let h;
   try { h = await getJSON(`/api/heatmap?from=${from}&to=${to}`); } catch (e) { h = { error: e.message, points: [] }; }
   heatCache.set(key, h);
-  const cur = resolve(state);
-  if (cur.from + '|' + cur.to === key) { heat = h; renderMap(); }
+  syncHeat(true);
 }
 async function load(force) { await fetchDataset(force); if (force) heatCache.clear(); recompute(); }
 
@@ -227,7 +259,9 @@ function render() {
   $$('[data-preset]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === state.preset)));
   $$('[data-mcity]').forEach(b => { if (b.dataset.mcity === 'riyadh') b.textContent = lang === 'ar' ? 'الرياض' : 'Riyadh'; if (b.dataset.mcity === 'jeddah') b.textContent = lang === 'ar' ? 'جدة' : 'Jeddah'; });
   const { from, to } = resolve(state);
-  $('#rangeLabel').innerHTML = `<b>${num(esc(t('dates')(from, to)))}</b>${perf?.range?.lastReported ? ' · ' + esc(t('lastRep')(perf.range.lastReported)) : ''}`;
+  $('#cmpSel').value = cmpMode;
+  const cmpTxt = cmpR ? ' · ' + num(esc(cmpShort())) : cmpMode !== 'off' ? ' · ' + esc(t('cmpNone')) : '';
+  $('#rangeLabel').innerHTML = `<b>${num(esc(t('dates')(from, to)))}</b>${perf?.range?.lastReported ? ' · ' + esc(t('lastRep')(perf.range.lastReported)) : ''}${cmpTxt}`;
   renderFresh(); renderPerf(); renderMap(); renderMkt();
 }
 
@@ -243,7 +277,7 @@ function renderFresh() {
   $('#freshTxt').textContent = `${allLive ? t('live') : t('snapshot')} · ${t('updated')} ${tm}${updating ? ' · ' + t('refreshing') : ''}`;
 }
 
-function kpi(label, val, tgtVal, fmt, kind, mtv) {
+function kpi(label, val, tgtVal, fmt, kind, mtv, cv) {
   const a = val, g = tgtVal;
   const st = status(a, g, kind);
   const pct = g ? Math.max(0, Math.min(100, (a / g) * 100)) : 0;
@@ -252,19 +286,20 @@ function kpi(label, val, tgtVal, fmt, kind, mtv) {
   return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(fmt(a))}</div>
     <div class="bar"><i class="${st}" style="width:${pct}%"></i></div>
     <div class="t"><span>${esc(t('target'))} ${num(fmt(g))}</span><span class="d ${st}">${num(dtxt)}</span></div>
-    ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} ${num(fmt(mtv))}</span></div>` : ''}</div>`;
+    ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} ${num(fmt(mtv))}</span></div>` : ''}${cv !== undefined ? cmpRow(a, cv, kind) : ''}</div>`;
 }
 
-function kpiPlain(label, value, note) {
-  return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(value)}</div><div class="t"><span>${esc(note)}</span></div></div>`;
+function kpiPlain(label, value, note, cur, prev, kind) {
+  return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(value)}</div><div class="t"><span>${esc(note)}</span></div>${cur !== undefined ? cmpRow(cur, prev, kind) : ''}</div>`;
 }
+const pc = f => (perfC ? f(perfC) : undefined);
 
 function renderPerf() {
   if (!perf) return;
   const T0 = perf.totals, G = perf.groups;
   // headline: total weight, spend and CPK against the prorated target
   const MT = perf.monthTargets || {};
-  const hl = (label, val, tg, fmt, kind, main, unit, mtv) => {
+  const hl = (label, val, tg, fmt, kind, main, unit, mtv, cv) => {
     const st = status(val, tg, kind);
     const r = tg ? val / tg : null;
     const pct = r == null ? 0 : Math.max(0, Math.min(100, r * 100));
@@ -274,12 +309,12 @@ function renderPerf() {
       <div class="v">${num(fmt(val))}${unit ? `<small>${esc(unit)}</small>` : ''}</div>
       <div class="bar"><i class="${st}" style="width:${pct}%"></i></div>
       <div class="t"><span>${esc(t('toDate'))} <b>${num(fmt(tg))}</b></span>${kind !== 'cost' && r != null ? `<span>${t('hlPace')(num(fmtN(r * 100, 0) + '%'))}</span>` : ''}</div>
-      ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} <b>${num(fmt(mtv))}</b></span>${kind !== 'cost' && mtv ? `<span>${t('hlPace')(num(fmtN(val / mtv * 100, 0) + '%'))}</span>` : ''}</div>` : ''}</div>`;
+      ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} <b>${num(fmt(mtv))}</b></span>${kind !== 'cost' && mtv ? `<span>${t('hlPace')(num(fmtN(val / mtv * 100, 0) + '%'))}</span>` : ''}</div>` : ''}${cv !== undefined ? cmpRow(val, cv, kind === 'pace' ? 'neutral' : kind) : ''}</div>`;
   };
   $('#headline').innerHTML = [
-    hl(t('hlWeight'), T0.weight, T0.weightT, v => fmtN(v), 'volume', 'teal', lang === 'ar' ? 'كغ' : 'kg', MT.weight),
-    hl(t('hlSpend'), T0.spend, T0.spendT, v => fmtUSD(v, 0), 'pace', 'soft', '', MT.spend),
-    hl(t('hlCpk'), T0.cpk, T0.cpkT, fmtC, 'cost', 'main', t('perKg'), MT.cpk),
+    hl(t('hlWeight'), T0.weight, T0.weightT, v => fmtN(v), 'volume', 'teal', lang === 'ar' ? 'كغ' : 'kg', MT.weight, pc(p => p.totals.weight)),
+    hl(t('hlSpend'), T0.spend, T0.spendT, v => fmtUSD(v, 0), 'pace', 'soft', '', MT.spend, pc(p => p.totals.spend)),
+    hl(t('hlCpk'), T0.cpk, T0.cpkT, fmtC, 'cost', 'main', t('perKg'), MT.cpk, pc(p => p.totals.cpk)),
   ].join('');
   // north star sentence under the group cards
   const diff = T0.cpkT ? T0.cpk / T0.cpkT - 1 : null;
@@ -288,25 +323,26 @@ function renderPerf() {
   $('#groups').innerHTML = ['paid', 'organic', 'wa'].map(g => {
     const x = G[g]; const s = status(x.cpk, x.cpkT, 'cost');
     return `<div class="sg"><h3>${esc(t(g))}</h3><div class="meta">${esc(t('groupMeta')(fmtUSD(x.spend), fmtN(x.weight)))}</div>
-      <div class="v"><span class="lbl">${esc(t('cpkLbl'))}</span><span class="num cpk-cell ${s}">${fmtC(x.cpk)}</span><span class="t">${esc(t('cpkTgtLbl'))} ${num(fmtC(x.cpkT))}</span></div></div>`;
+      <div class="v"><span class="lbl">${esc(t('cpkLbl'))}</span><span class="num cpk-cell ${s}">${fmtC(x.cpk)}</span><span class="t">${esc(t('cpkTgtLbl'))} ${num(fmtC(x.cpkT))}</span>${perfC ? `<span class="t">${esc(cmpShort())} ${dchg(x.cpk, perfC.groups[g].cpk, 'cost') || '-'}</span>` : ''}</div></div>`;
   }).join('');
-  const gl = g => kpi(`${t(g)}: ${t('leads')}`, G[g].leads, G[g].leadsT, v => fmtN(v), 'volume', MT.groups && MT.groups[g].leadsT);
+  const gl = g => kpi(`${t(g)}: ${t('leads')}`, G[g].leads, G[g].leadsT, v => fmtN(v), 'volume', MT.groups && MT.groups[g].leadsT, pc(p => p.groups[g].leads));
+  const dna = donorsNA(), D0 = perf.donors, DC = perfC && perfC.donors;
   $('#kpiMkt').innerHTML = [
-    kpi(t('spend'), T0.spend, T0.spendT, fmtUSD, 'pace', MT.spend),
-    kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume', MT.leads),
-    kpiPlain(t('newDonors'), donorsNA() ? '-' : fmtN(perf.donors.newN), donorsNA() ? '' : t('shareOfDonors')(fmtP(perf.donors.newShare))),
-    kpiPlain(t('retDonors'), donorsNA() ? '-' : fmtN(perf.donors.retN), donorsNA() ? '' : t('shareOfDonors')(fmtP(perf.donors.newShare == null ? null : 1 - perf.donors.newShare))),
+    kpi(t('spend'), T0.spend, T0.spendT, fmtUSD, 'pace', MT.spend, pc(p => p.totals.spend)),
+    kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume', MT.leads, pc(p => p.totals.leads)),
+    kpiPlain(t('newDonors'), dna ? '-' : fmtN(D0.newN), dna ? '' : t('shareOfDonors')(fmtP(D0.newShare)), dna || !DC ? undefined : D0.newN, DC && DC.newN, 'volume'),
+    kpiPlain(t('retDonors'), dna ? '-' : fmtN(D0.retN), dna ? '' : t('shareOfDonors')(fmtP(D0.newShare == null ? null : 1 - D0.newShare)), dna || !DC ? undefined : D0.retN, DC && DC.retN, 'volume'),
     gl('paid'), gl('organic'), gl('wa'),
-    kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost', MT.cpl),
-    kpiPlain('nCAC', fmtC(perf.donors.nCAC), t('ncacNote')),
-    kpiPlain('rCAC', fmtC(perf.donors.rCAC), t('rcacNote')),
+    kpi(t('cpl'), T0.cpl, T0.cplT, fmtC, 'cost', MT.cpl, pc(p => p.totals.cpl)),
+    kpiPlain('nCAC', fmtC(D0.nCAC), t('ncacNote'), dna || !DC ? undefined : D0.nCAC, DC && DC.nCAC, 'cost'),
+    kpiPlain('rCAC', fmtC(D0.rCAC), t('rcacNote'), dna || !DC ? undefined : D0.rCAC, DC && DC.rCAC, 'cost'),
   ].join('');
   $('#kpiLog').innerHTML = [
-    kpi(t('pickups'), T0.pickups, T0.pickupsT, v => fmtN(v), 'volume', MT.pickups),
-    kpi(t('weight'), T0.weight, T0.weightT, v => fmtN(v) + (lang === 'ar' ? ' كغ' : ' kg'), 'volume', MT.weight),
-    kpi(t('pickupRate'), T0.pickupRate, T0.pickupRateT, fmtP, 'volume', MT.pickupRate),
-    kpi(t('kgPerPickup'), T0.kgPerPickup, T0.kgPerPickupT, v => fmtN(v, 1), 'volume', MT.kgPerPickup),
-    kpi(t('cac'), T0.cac, T0.cacT, fmtC, 'cost', MT.cac),
+    kpi(t('pickups'), T0.pickups, T0.pickupsT, v => fmtN(v), 'volume', MT.pickups, pc(p => p.totals.pickups)),
+    kpi(t('weight'), T0.weight, T0.weightT, v => fmtN(v) + (lang === 'ar' ? ' كغ' : ' kg'), 'volume', MT.weight, pc(p => p.totals.weight)),
+    kpi(t('pickupRate'), T0.pickupRate, T0.pickupRateT, fmtP, 'volume', MT.pickupRate, pc(p => p.totals.pickupRate)),
+    kpi(t('kgPerPickup'), T0.kgPerPickup, T0.kgPerPickupT, v => fmtN(v, 1), 'volume', MT.kgPerPickup, pc(p => p.totals.kgPerPickup)),
+    kpi(t('cac'), T0.cac, T0.cacT, fmtC, 'cost', MT.cac, pc(p => p.totals.cac)),
   ].join('');
 
   // cities
@@ -314,18 +350,19 @@ function renderPerf() {
   const ach = (a, tg) => { if (!tg) return '<td></td>'; const r = a / tg, st = status(a, tg, 'volume');
     return `<td class="ach"><div class="achrow"><span class="minibar"><i class="${st}" style="width:${Math.min(100, r * 100)}%"></i></span><b class="num ${st}">${fmtN(r * 100, 0)}%</b></div></td>`; };
   $('#cityTbl').innerHTML = `<thead><tr><th>${t('city')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('pickups')}</th><th>kg</th><th>${t('kgAch')}</th><th>${t('cpk')}</th></tr></thead><tbody>` +
-    perf.cities.map(c => `<tr><td>${esc(c.label[lang])}</td>
-      <td>${num(fmtUSD(c.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(c.spendT))}</span></td>
-      <td>${num(fmtN(c.leads))}<span class="sub">${num(fmtN(c.leadsT))}</span></td>
-      <td>${num(fmtN(c.pickups))}<span class="sub">${num(fmtN(c.pickupsT))}</span></td>
-      <td>${num(fmtN(c.weight))}<span class="sub">${num(fmtN(c.weightT))}</span></td>${ach(c.weight, c.weightT)}
-      <td class="cpk-cell ${status(c.cpk, c.cpkT, 'cost')}">${num(fmtC(c.cpk))}<span class="sub">${num(fmtC(c.cpkT))}</span></td></tr>`).join('') + '</tbody>' +
+    perf.cities.map(c => { const q = perfC && perfC.cities.find(x => x.city === c.city) || {};
+      return `<tr><td>${esc(c.label[lang])}</td>
+      <td>${num(fmtUSD(c.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(c.spendT))}</span>${dchg(c.spend, q.spend, 'neutral', 20)}</td>
+      <td>${num(fmtN(c.leads))}<span class="sub">${num(fmtN(c.leadsT))}</span>${dchg(c.leads, q.leads, 'volume', 5)}</td>
+      <td>${num(fmtN(c.pickups))}<span class="sub">${num(fmtN(c.pickupsT))}</span>${dchg(c.pickups, q.pickups, 'volume', 5)}</td>
+      <td>${num(fmtN(c.weight))}<span class="sub">${num(fmtN(c.weightT))}</span>${dchg(c.weight, q.weight, 'volume', 50)}</td>${ach(c.weight, c.weightT)}
+      <td class="cpk-cell ${status(c.cpk, c.cpkT, 'cost')}">${num(fmtC(c.cpk))}<span class="sub">${num(fmtC(c.cpkT))}</span>${dchg(c.cpk, q.weight >= 50 ? q.cpk : null, 'cost')}</td></tr>`; }).join('') + '</tbody>' +
     `<tfoot><tr><td>${esc(t18('total'))}</td>
-      <td>${num(fmtUSD(T0.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(T0.spendT))}</span></td>
-      <td>${num(fmtN(T0.leads))}<span class="sub">${num(fmtN(T0.leadsT))}</span></td>
-      <td>${num(fmtN(T0.pickups))}<span class="sub">${num(fmtN(T0.pickupsT))}</span></td>
-      <td>${num(fmtN(T0.weight))}<span class="sub">${num(fmtN(T0.weightT))}</span></td>${ach(T0.weight, T0.weightT)}
-      <td class="cpk-cell ${status(T0.cpk, T0.cpkT, 'cost')}">${num(fmtC(T0.cpk))}<span class="sub">${num(fmtC(T0.cpkT))}</span></td></tr></tfoot>`;
+      <td>${num(fmtUSD(T0.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(T0.spendT))}</span>${dchg(T0.spend, pc(p => p.totals.spend), 'neutral')}</td>
+      <td>${num(fmtN(T0.leads))}<span class="sub">${num(fmtN(T0.leadsT))}</span>${dchg(T0.leads, pc(p => p.totals.leads), 'volume')}</td>
+      <td>${num(fmtN(T0.pickups))}<span class="sub">${num(fmtN(T0.pickupsT))}</span>${dchg(T0.pickups, pc(p => p.totals.pickups), 'volume')}</td>
+      <td>${num(fmtN(T0.weight))}<span class="sub">${num(fmtN(T0.weightT))}</span>${dchg(T0.weight, pc(p => p.totals.weight), 'volume')}</td>${ach(T0.weight, T0.weightT)}
+      <td class="cpk-cell ${status(T0.cpk, T0.cpkT, 'cost')}">${num(fmtC(T0.cpk))}<span class="sub">${num(fmtC(T0.cpkT))}</span>${dchg(T0.cpk, pc(p => p.totals.cpk), 'cost')}</td></tr></tfoot>`;
 
   // chart
   const last = perf.range.lastReported || perf.range.to;
@@ -513,14 +550,22 @@ function renderMap() {
   });
   if (pts.length && mcity !== 'all') map.fitBounds(L.latLngBounds(pts.filter(p => p.precision === 'district').map(p => [p.lat, p.lng]).concat(pts.length ? [[pts[0].lat, pts[0].lng]] : [])).pad(0.1), { maxZoom: 12 });
   else if (mcity === 'all') map.setView([23.9, 45.1], 5);
-  const tot = pts.reduce((a, p) => ({ d: a.d + p.donations, k: a.k + p.kg, n: a.n + (p.donations ? 1 : 0) }), { d: 0, k: 0, n: 0 });
-  $('#mapStats').innerHTML = `<div class="kpi"><div class="k">${t('donationsRec')}</div><div class="v">${num(fmtN(tot.d))}</div></div>
-    <div class="kpi"><div class="k">${t('totalKg')}</div><div class="v">${num(fmtN(tot.k))}</div></div>
-    <div class="kpi"><div class="k">${t('districts')}</div><div class="v">${num(fmtN(tot.n))}</div></div>`;
+  const inCity = p => mcity === 'all' ? true : mcity === 'other' ? !['riyadh', 'jeddah'].includes(p.city) : p.city === mcity;
+  const sumPts = list => list.reduce((a, p) => ({ d: a.d + p.donations, k: a.k + p.kg, n: a.n + (p.donations ? 1 : 0) }), { d: 0, k: 0, n: 0 });
+  const tot = sumPts(pts);
+  // comparison period (fetched separately; shows '…' until it arrives)
+  const cPts = heatC && !heatC.error ? (heatC.points || []).filter(inCity) : null;
+  const ctot = cPts ? sumPts(cPts) : null;
+  const pkey = p => p.city + '|' + p.en;
+  const cIdx = cPts ? new Map(cPts.map(p => [pkey(p), p])) : null;
+  const mrow = (cur, prev) => !cmpR ? '' : `<div class="t cmp"><span>${esc(cmpShort())}</span>${ctot ? dchg(cur, prev, 'volume') || '<span class="dl flat">-</span>' : '<span class="dl flat">…</span>'}</div>`;
+  $('#mapStats').innerHTML = `<div class="kpi"><div class="k">${t('donationsRec')}</div><div class="v">${num(fmtN(tot.d))}</div>${mrow(tot.d, ctot && ctot.d)}</div>
+    <div class="kpi"><div class="k">${t('totalKg')}</div><div class="v">${num(fmtN(tot.k))}</div>${mrow(tot.k, ctot && ctot.k)}</div>
+    <div class="kpi"><div class="k">${t('districts')}</div><div class="v">${num(fmtN(tot.n))}</div>${mrow(tot.n, ctot && ctot.n)}</div>`;
   const top = [...pts].sort((a, b) => val(b) - val(a)).slice(0, 15);
   $('#topTbl').innerHTML = `<thead><tr><th>${t('district')}</th><th>${t('city')}</th><th>${t('donationsRec')}</th><th>kg</th><th>${t('kgPerDonation')}</th></tr></thead><tbody>` +
-    top.map(p => `<tr><td>${esc(lang === 'ar' ? p.ar : p.en)}${p.precision === 'city' ? ' <span class="approx">•</span>' : ''}</td><td>${esc(lang === 'ar' ? p.cityAr : p.cityEn)}</td><td>${num(fmtN(p.donations))}</td><td>${num(fmtN(p.kg))}</td><td>${num(fmtN(p.donations ? p.kg / p.donations : null, 1))}</td></tr>`).join('') + '</tbody>' +
-    `<tfoot><tr><td>${esc(t('totalAll'))}</td><td></td><td>${num(fmtN(tot.d))}</td><td>${num(fmtN(tot.k))}</td><td>${num(fmtN(tot.d ? tot.k / tot.d : null, 1))}</td></tr></tfoot>`;
+    top.map(p => `<tr><td>${esc(lang === 'ar' ? p.ar : p.en)}${p.precision === 'city' ? ' <span class="approx">•</span>' : ''}</td><td>${esc(lang === 'ar' ? p.cityAr : p.cityEn)}</td><td>${num(fmtN(p.donations))}${cIdx ? dchg(p.donations, (cIdx.get(pkey(p)) || {}).donations, 'volume', 3) : ''}</td><td>${num(fmtN(p.kg))}</td><td>${num(fmtN(p.donations ? p.kg / p.donations : null, 1))}</td></tr>`).join('') + '</tbody>' +
+    `<tfoot><tr><td>${esc(t('totalAll'))}</td><td></td><td>${num(fmtN(tot.d))}${ctot ? dchg(tot.d, ctot.d, 'volume') : ''}</td><td>${num(fmtN(tot.k))}${ctot ? dchg(tot.k, ctot.k, 'volume') : ''}</td><td>${num(fmtN(tot.d ? tot.k / tot.d : null, 1))}</td></tr></tfoot>`;
   const notes = [];
   if (heat.error) notes.push(heat.error); else notes.push(t('mapSrc'));
   if (heat.locationTable != null) notes.push(t('locNote')(fmtN(heat.locationTable), fmtP(heat.placedShare)));
@@ -600,16 +645,17 @@ $$('[data-preset]').forEach(b => b.addEventListener('click', e => {
 }));
 $('#lang').addEventListener('click', () => { lang = lang === 'ar' ? 'en' : 'ar'; localStorage.setItem('awon-lang', lang); picker.hidden = true; render(); });
 $('#refresh').addEventListener('click', () => load(true));
+$('#cmpSel').addEventListener('change', e => { cmpMode = e.target.value; try { localStorage.setItem('awon-cmp', cmpMode); } catch (err) {} recompute(); });
 function showTab(which) {
   for (const k of ['perf', 'mkt', 'map']) { $('#tab-' + k).setAttribute('aria-selected', String(k === which)); $('#view-' + k).hidden = k !== which; }
   location.hash = which === 'perf' ? '' : which;
-  if (which === 'map' && !heat) { const r = resolve(state); loadHeat(r.from + '|' + r.to, r.from, r.to); }
+  if (which === 'map') ensureHeat();
   renderMap(); renderMkt();
 }
 function renderMkt() {
   if (!window.AwonMkt || $('#view-mkt').hidden) return;
   const { from, to } = resolve(state);
-  try { $('#mktErr').innerHTML = ''; AwonMkt.render({ ds: dataset, from, to, lang, perf }); } catch (e) { console.error(e); $('#mktErr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  try { $('#mktErr').innerHTML = ''; AwonMkt.render({ ds: dataset, from, to, lang, perf, cmp: cmpMode }); } catch (e) { console.error(e); $('#mktErr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 $('#tab-perf').addEventListener('click', () => showTab('perf'));
 $('#tab-mkt').addEventListener('click', () => showTab('mkt'));
