@@ -193,10 +193,24 @@
       const seen = new Map();
       donors.newPk = donors.newKg = donors.retPk = donors.retKg = 0;
       donors.pkKnown = !ds.donors.rows.length || ds.donors.rows[0].length > 3;   // older saved data has no weight per order
+      // Odoo weights run below the real (Daily tab) weights, so per calendar month the Odoo kg and pickups of each
+      // group are scaled by (Daily tab total / Odoo total) for that month. New + returning then add up to the Weight
+      // and Pickups cards, and the new/returning proportions come from Odoo.
+      const mo = {};
+      const mkOf = d => new Date(b0 + d * 864e5).toISOString().slice(0, 7);
       for (const [d, pid, fd, kg] of ds.donors.rows) if (d >= f && d <= t) {
         if (!seen.has(pid)) seen.set(pid, fd);
-        if (fd >= f) { donors.newPk++; donors.newKg += kg || 0; } else { donors.retPk++; donors.retKg += kg || 0; }
+        const x = mo[mkOf(d)] || (mo[mkOf(d)] = { nk: 0, np: 0, rk: 0, rp: 0, sk: 0, sp: 0 });
+        if (fd >= f) { x.np++; x.nk += kg || 0; } else { x.rp++; x.rk += kg || 0; }
       }
+      for (const s2 of Object.values(series)) { const x = mo[s2.date.slice(0, 7)]; if (x) { x.sk += s2.weight; x.sp += s2.pickups; } }
+      donors.rawNewKg = donors.rawRetKg = 0;
+      for (const x of Object.values(mo)) {
+        const fk = (x.nk + x.rk) > 0 && x.sk > 0 ? x.sk / (x.nk + x.rk) : 1, fp = (x.np + x.rp) > 0 && x.sp > 0 ? x.sp / (x.np + x.rp) : 1;
+        donors.rawNewKg += x.nk; donors.rawRetKg += x.rk;
+        donors.newKg += x.nk * fk; donors.retKg += x.rk * fk; donors.newPk += x.np * fp; donors.retPk += x.rp * fp;
+      }
+      donors.kgFactor = div(donors.newKg + donors.retKg, donors.rawNewKg + donors.rawRetKg);
       for (const fd of seen.values()) { if (fd >= f) donors.newN++; else donors.retN++; }
     }
 
