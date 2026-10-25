@@ -29,7 +29,7 @@ const T = {
     n3: 'Website visits are GA4 sessions. GA4 has no city data for this site, so paid visits get their city from the campaign name and organic visits have no city.',
     n4: 'Organic CPL: Meta, TikTok and Snapchat use the branding spend on that platform; website organic uses the organic budget from the Daily tab; partners and PR have no direct spend.',
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
-    n6: 'Changes (▲▼) and insights compare the selected period with the period chosen in "Compare to" (the same number of days just before it, or the same days last month), and ignore sources with too little volume to judge.',
+    n6: 'Changes (▲▼) and insights compare the selected period with the period chosen in "Compare to" (the same number of days just before it, the same days last month, or custom dates; with custom dates of a different length, totals are compared as they are), and ignore sources with too little volume to judge.',
     n8: 'Spend and lead targets come from the Forecast tab: each city\'s monthly target for the group spread evenly over the days of the month. Spend and CPL targets include each group\'s share of the marketing overhead (split by budget), the same as Performance; actual spend is direct media spend from the Daily tab.',
     n7: 'WhatsApp campaign numbers (sent, delivered, seen, leads, spend) come from the Awon WA Performance Report sheet. Rates: delivered / sent, seen / delivered, leads / delivered.',
     inOdoo: 'In Odoo now:',
@@ -85,7 +85,7 @@ const T = {
     n3: 'زيارات الموقع هي جلسات GA4. لا توجد بيانات مدن في GA4 لهذا الموقع، لذلك المدينة للزيارات المدفوعة من اسم الحملة والزيارات العضوية بلا مدينة.',
     n4: 'تكلفة العميل العضوي: ميتا وتيك توك وسناب تستخدم إنفاق العلامة على المنصة نفسها؛ الموقع يستخدم ميزانية العضوي من التبويب اليومي؛ الشركاء والعلاقات العامة بلا إنفاق مباشر.',
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
-    n6: 'التغيّرات (▲▼) والملاحظات تقارن الفترة المحددة بالفترة المختارة في "قارن مع" (نفس عدد الأيام قبلها مباشرة، أو نفس الأيام من الشهر السابق)، وتتجاهل المصادر ذات الحجم القليل.',
+    n6: 'التغيّرات (▲▼) والملاحظات تقارن الفترة المحددة بالفترة المختارة في "قارن مع" (نفس عدد الأيام قبلها مباشرة، أو نفس الأيام من الشهر السابق، أو تواريخ مخصصة؛ إذا اختلف عدد الأيام تُقارن الإجماليات كما هي)، وتتجاهل المصادر ذات الحجم القليل.',
     n8: 'مستهدفات الإنفاق والعملاء من تبويب التوقعات: المستهدف الشهري لكل مدينة موزع بالتساوي على أيام الشهر. مستهدفات الإنفاق وتكلفة العميل تشمل حصة كل مجموعة من المصاريف التسويقية العامة (حسب الميزانية) كما في قسم الأداء؛ الإنفاق الفعلي هو الإنفاق الإعلاني المباشر من التبويب اليومي.',
     n7: 'أرقام حملات واتساب (المرسلة، المستلمة، المقروءة، العملاء، الإنفاق) من شيت تقرير أداء واتساب. النسب: المستلمة / المرسلة، المقروءة / المستلمة، العملاء / المستلمة.',
     inOdoo: 'في Odoo الآن:',
@@ -467,8 +467,10 @@ function render({ ds, from, to, lang, perf, cmp }) {
   if (lastRep && lastRep < end && lastRep >= from) end = lastRep;
   const n = days(from, end);
   // comparison period from the "Compare to" control; insights still use the previous period when it's off
-  const mode = cmp || 'prev';
-  const cr = window.AwonCalc && AwonCalc.cmpRange ? AwonCalc.cmpRange(mode === 'off' ? 'prev' : mode, from, end, (ds.firstMonth || '2026-02') + '-01') : null;
+  // cmp is a mode ('prev' | 'month' | 'off') or custom dates { from, to } picked in the calendar
+  const custom = !!cmp && typeof cmp === 'object';
+  const mode = custom ? 'custom' : cmp || 'prev';
+  const cr = custom ? cmp : window.AwonCalc && AwonCalc.cmpRange ? AwonCalc.cmpRange(mode === 'off' ? 'prev' : mode, from, end, (ds.firstMonth || '2026-02') + '-01') : null;
   CMP_ON = mode !== 'off' && !!cr;
   const pFrom = cr ? cr.from : addD(from, -n), pTo = cr ? cr.to : addD(from, -1);
   const vsTxt = CMP_ON ? t('vsR')(fRange(pFrom, pTo)) : '';

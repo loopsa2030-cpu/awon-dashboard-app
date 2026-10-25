@@ -17,7 +17,7 @@ const T = {
     title: 'Performance dashboard', subtitle: 'Marketing, logistics and donors across Saudi Arabia',
     refresh: 'Refresh', tabPerf: 'Performance', tabMkt: 'Marketing', tabMap: 'Donor map',
     all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', custom: 'Pick dates…',
-    cmpLbl: 'Compare to', cmpPrev: 'Previous period', cmpMonth: 'Same days last month', cmpOff: 'No comparison', vs: r => `vs ${r}`, cmpNone: 'no earlier data to compare',
+    cmpLbl: 'Compare to', cmpPrev: 'Previous period', cmpMonth: 'Same days last month', cmpOff: 'No comparison', cmpCustom: 'Custom dates…', cmpEdit: 'Change dates', cmpLen: (a, b) => `${a} days vs ${b} days, totals not adjusted`, vs: r => `vs ${r}`, cmpNone: 'no earlier data to compare',
     northStar: 'North star: cost per kg collected', perKg: 'per kg',
     marketing: 'Marketing', logistics: 'Logistics', vsTarget: 'Actual against the forecast, prorated to the last reported day',
     logiNote: 'Fridays are non-operating days in the target', platforms: 'Source groups',
@@ -75,7 +75,7 @@ const T = {
     title: 'لوحة الأداء', subtitle: 'التسويق واللوجستيات والمتبرعون في المملكة',
     refresh: 'تحديث', tabPerf: 'الأداء', tabMkt: 'التسويق', tabMap: 'خريطة المتبرعين',
     all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', custom: 'اختيار التواريخ…',
-    cmpLbl: 'قارن مع', cmpPrev: 'الفترة السابقة', cmpMonth: 'نفس الأيام من الشهر السابق', cmpOff: 'بدون مقارنة', vs: r => `مقارنة بـ ${r}`, cmpNone: 'لا توجد بيانات سابقة للمقارنة',
+    cmpLbl: 'قارن مع', cmpPrev: 'الفترة السابقة', cmpMonth: 'نفس الأيام من الشهر السابق', cmpOff: 'بدون مقارنة', cmpCustom: 'تواريخ مخصصة…', cmpEdit: 'تغيير التواريخ', cmpLen: (a, b) => `${a} يوماً مقابل ${b} يوماً، الإجماليات بدون تعديل`, vs: r => `مقارنة بـ ${r}`, cmpNone: 'لا توجد بيانات سابقة للمقارنة',
     northStar: 'المؤشر الأساسي: تكلفة الكيلوغرام المجمّع', perKg: 'لكل كغ',
     marketing: 'التسويق', logistics: 'اللوجستيات', vsTarget: 'الفعلي مقابل المستهدف حتى آخر يوم مُسجّل',
     logiNote: 'أيام الجمعة غير تشغيلية في المستهدف', platforms: 'مجموعات المصادر',
@@ -158,7 +158,11 @@ const FIRST = '2026-02-01';
 let state = JSON.parse(sessionStorage.getItem('awon-range') || 'null') || { preset: 'month' };
 // comparison: 'prev' (same length just before), 'month' (same days last month) or 'off'; remembered in this browser
 let cmpMode = (() => { try { return localStorage.getItem('awon-cmp') || 'prev'; } catch (e) { return 'prev'; } })();
-let cmpR = null, perfC = null, heatC = null;
+// custom comparison dates picked in the calendar: { from, to }
+let cmpCustom = (() => { try { return JSON.parse(localStorage.getItem('awon-cmp-custom') || 'null'); } catch (e) { return null; } })();
+if (cmpMode === 'custom' && !cmpCustom) cmpMode = 'prev';
+const nDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1;
+let cmpR = null, perfC = null, heatC = null, cmpLen = null;
 const fmtDay = d => new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(d + 'T00:00:00Z')).replace('Sept', 'Sep');
 const fmtRange = (a, b) => a === b ? fmtDay(a) : a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${fmtDay(b)}` : `${fmtDay(a)} – ${fmtDay(b)}`;
 const cmpShort = () => cmpR ? t('vs')(fmtRange(cmpR.from, cmpR.to)) : '';
@@ -220,7 +224,9 @@ function recompute() {
   // the comparison covers as many days as are reported in the selected range
   const lr = perf && perf.range.lastReported;
   const cEnd = lr && lr >= from && lr < to ? lr : to;
-  cmpR = window.AwonCalc && AwonCalc.cmpRange ? AwonCalc.cmpRange(cmpMode, from, cEnd, FIRST) : null;
+  if (cmpMode === 'custom') cmpR = cmpCustom && cmpCustom.to >= FIRST ? { from: cmpCustom.from < FIRST ? FIRST : cmpCustom.from, to: cmpCustom.to } : null;
+  else cmpR = window.AwonCalc && AwonCalc.cmpRange ? AwonCalc.cmpRange(cmpMode, from, cEnd, FIRST) : null;
+  cmpLen = cmpR ? [nDays(from, cEnd), nDays(cmpR.from, cmpR.to)] : null;
   perfC = dataset && cmpR ? AwonCalc.compute(dataset, cmpR.from, cmpR.to) : null;
   if (perfC && !perfC.range.lastReported) perfC = null;
   if (perf && !perf.range.lastReported && !dataErr) $('#perfErr').innerHTML = `<div class="err" style="color:var(--muted);background:#fff;border-color:var(--line)">${esc(lang === 'ar' ? 'لا توجد بيانات مسجلة لهذه الفترة بعد: يُحدَّث الشيت يومياً.' : 'Nothing reported for this period yet: the sheet is updated daily.')}</div>`;
@@ -260,7 +266,9 @@ function render() {
   $$('[data-mcity]').forEach(b => { if (b.dataset.mcity === 'riyadh') b.textContent = lang === 'ar' ? 'الرياض' : 'Riyadh'; if (b.dataset.mcity === 'jeddah') b.textContent = lang === 'ar' ? 'جدة' : 'Jeddah'; });
   const { from, to } = resolve(state);
   $('#cmpSel').value = cmpMode;
-  const cmpTxt = cmpR ? ' · ' + num(esc(cmpShort())) : cmpMode !== 'off' ? ' · ' + esc(t('cmpNone')) : '';
+  $('#cmpSel option[value=custom]').textContent = cmpMode === 'custom' && cmpCustom ? `${t('cmpCustom').replace('…', '')}: ${fmtRange(cmpCustom.from, cmpCustom.to)}` : t('cmpCustom');
+  $('#cmpEdit').hidden = cmpMode !== 'custom';
+  const cmpTxt = cmpR ? ' · ' + num(esc(cmpShort())) + (cmpLen && cmpLen[0] !== cmpLen[1] ? ` <span class="len-warn">(${num(esc(t('cmpLen')(cmpLen[0], cmpLen[1])))})</span>` : '') : cmpMode !== 'off' ? ' · ' + esc(t('cmpNone')) : '';
   $('#rangeLabel').innerHTML = `<b>${num(esc(t('dates')(from, to)))}</b>${perf?.range?.lastReported ? ' · ' + esc(t('lastRep')(perf.range.lastReported)) : ''}${cmpTxt}`;
   renderFresh(); renderPerf(); renderMap(); renderMkt();
 }
@@ -581,12 +589,13 @@ const picker = $('#picker');
 let pk = { mode: 'days', cursor: todayKSA().slice(0, 7), a: null, b: null };
 const MONTHS = { en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], ar: ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'] };
 const DOW = { en: ['Su','Mo','Tu','We','Th','Fr','Sa'], ar: ['ح','ن','ث','ر','خ','ج','س'] };
-function openPicker() {
-  const r = $('#customBtn').getBoundingClientRect();
+function openPicker(target) {
+  pk.target = target === 'cmp' ? 'cmp' : 'main';
+  const r = (pk.target === 'cmp' ? $('#cmpSel') : $('#customBtn')).getBoundingClientRect();
   picker.hidden = false;
   const left = lang === 'ar' ? Math.max(8, r.right - 320) : Math.min(r.left, innerWidth - 330);
   picker.style.left = left + scrollX + 'px'; picker.style.top = r.bottom + scrollY + 8 + 'px';
-  const cur = resolve(state); pk.a = cur.from; pk.b = cur.to; pk.cursor = cur.to.slice(0, 7);
+  const cur = pk.target === 'cmp' ? (cmpCustom || cmpR || resolve(state)) : resolve(state); pk.a = cur.from; pk.b = cur.to; pk.cursor = cur.to.slice(0, 7);
   drawPicker();
 }
 function drawPicker() {
@@ -632,20 +641,29 @@ picker.addEventListener('click', e => {
   else if (b.dataset.month) { const k = b.dataset.month; const s = k + '-01', e2 = endOfMonth(k);
     if (pk.a && pk.b && pk.a.slice(0, 7) !== pk.b.slice(0, 7) || !pk.a || pk.a.slice(8) !== '01' || s < pk.a) { pk.a = s; pk.b = e2; }
     else if (pk.a.slice(0, 7) === k) { pk.a = s; pk.b = e2; } else pk.b = e2; }
-  else if ('apply' in b.dataset) { if (pk.a) { state = { preset: 'custom', from: pk.a, to: pk.b || pk.a }; save(); picker.hidden = true; recompute(); } return; }
+  else if ('apply' in b.dataset) { if (pk.a) {
+    if (pk.target === 'cmp') { cmpCustom = { from: pk.a, to: pk.b || pk.a }; cmpMode = 'custom'; try { localStorage.setItem('awon-cmp', cmpMode); localStorage.setItem('awon-cmp-custom', JSON.stringify(cmpCustom)); } catch (err) {} }
+    else { state = { preset: 'custom', from: pk.a, to: pk.b || pk.a }; save(); }
+    picker.hidden = true; recompute(); } return; }
   drawPicker();
 });
-document.addEventListener('click', e => { if (!picker.hidden && !picker.contains(e.target) && e.target.id !== 'customBtn') picker.hidden = true; });
+// closing the calendar without applying leaves the comparison as it was
+function closePicker() { picker.hidden = true; $('#cmpSel').value = cmpMode; }
+document.addEventListener('click', e => { if (!picker.hidden && !picker.contains(e.target) && e.target.id !== 'customBtn' && !e.target.closest('.cmp-sel')) closePicker(); });
 function save() { sessionStorage.setItem('awon-range', JSON.stringify(state)); }
 
 // ---------------- events ----------------
 $$('[data-preset]').forEach(b => b.addEventListener('click', e => {
-  if (b.dataset.preset === 'custom') { e.stopPropagation(); picker.hidden ? openPicker() : (picker.hidden = true); return; }
+  if (b.dataset.preset === 'custom') { e.stopPropagation(); picker.hidden || pk.target !== 'main' ? openPicker('main') : (picker.hidden = true); return; }
   state = { preset: b.dataset.preset }; save(); recompute();
 }));
 $('#lang').addEventListener('click', () => { lang = lang === 'ar' ? 'en' : 'ar'; localStorage.setItem('awon-lang', lang); picker.hidden = true; render(); });
 $('#refresh').addEventListener('click', () => load(true));
-$('#cmpSel').addEventListener('change', e => { cmpMode = e.target.value; try { localStorage.setItem('awon-cmp', cmpMode); } catch (err) {} recompute(); });
+$('#cmpSel').addEventListener('change', e => {
+  if (e.target.value === 'custom') { openPicker('cmp'); return; }   // applied from the calendar
+  cmpMode = e.target.value; picker.hidden = true; try { localStorage.setItem('awon-cmp', cmpMode); } catch (err) {} recompute();
+});
+$('#cmpEdit').addEventListener('click', e => { e.stopPropagation(); picker.hidden || pk.target !== 'cmp' ? openPicker('cmp') : closePicker(); });
 function showTab(which) {
   for (const k of ['perf', 'mkt', 'map']) { $('#tab-' + k).setAttribute('aria-selected', String(k === which)); $('#view-' + k).hidden = k !== which; }
   location.hash = which === 'perf' ? '' : which;
@@ -655,7 +673,7 @@ function showTab(which) {
 function renderMkt() {
   if (!window.AwonMkt || $('#view-mkt').hidden) return;
   const { from, to } = resolve(state);
-  try { $('#mktErr').innerHTML = ''; AwonMkt.render({ ds: dataset, from, to, lang, perf, cmp: cmpMode }); } catch (e) { console.error(e); $('#mktErr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  try { $('#mktErr').innerHTML = ''; AwonMkt.render({ ds: dataset, from, to, lang, perf, cmp: cmpMode === 'custom' ? (cmpR || 'off') : cmpMode }); } catch (e) { console.error(e); $('#mktErr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 $('#tab-perf').addEventListener('click', () => showTab('perf'));
 $('#tab-mkt').addEventListener('click', () => showTab('mkt'));

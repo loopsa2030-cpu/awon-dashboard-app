@@ -39,7 +39,8 @@
     <button class="chip" data-preset="month" data-i18n="thisMonth">This month</button>
     <button class="chip" data-preset="custom" id="customBtn" data-i18n="custom">Pick dates…</button>
     <label class="cmp-sel"><span data-i18n="cmpLbl">Compare to</span>
-      <select id="cmpSel"><option value="prev" data-i18n="cmpPrev">Previous period</option><option value="month" data-i18n="cmpMonth">Same days last month</option><option value="off" data-i18n="cmpOff">No comparison</option></select></label>
+      <select id="cmpSel"><option value="prev" data-i18n="cmpPrev">Previous period</option><option value="month" data-i18n="cmpMonth">Same days last month</option><option value="custom" data-i18n="cmpCustom">Custom dates…</option><option value="off" data-i18n="cmpOff">No comparison</option></select>
+      <button class="chip" id="cmpEdit" type="button" data-i18n="cmpEdit" hidden>Change dates</button></label>
     <span class="range-label" id="rangeLabel"></span>
   </div>
 </div>
