@@ -30,7 +30,7 @@ const T = {
     n4: 'Organic CPL: Meta, TikTok and Snapchat use the branding spend on that platform; website organic uses the organic budget from the Daily tab; partners and PR have no direct spend.',
     n5: 'City tables use the Daily tab, so they match the sheet the team fills in every day.',
     n6: 'Changes (▲▼) and insights compare the selected period with the period chosen in "Compare to" (the same number of days just before it, or the same days last month), and ignore sources with too little volume to judge.',
-    n8: 'Spend and lead targets come from the Forecast tab: each city\'s monthly target for the group spread evenly over the days of the month. Spend targets are the direct media budget (no marketing overhead).',
+    n8: 'Spend and lead targets come from the Forecast tab: each city\'s monthly target for the group spread evenly over the days of the month. Spend and CPL targets include each group\'s share of the marketing overhead (split by budget), the same as Performance; actual spend is direct media spend from the Daily tab.',
     n7: 'WhatsApp campaign numbers (sent, delivered, seen, leads, spend) come from the Awon WA Performance Report sheet. Rates: delivered / sent, seen / delivered, leads / delivered.',
     inOdoo: 'In Odoo now:',
     tgtTD: 'Target to date', tgtMonth: 'Month target', vsR: r => `vs ${r}`, tgtCpl: 'Target', tgtLine: 'Daily target', achieved: 'achieved', dayTotal: 'Total',
@@ -86,7 +86,7 @@ const T = {
     n4: 'تكلفة العميل العضوي: ميتا وتيك توك وسناب تستخدم إنفاق العلامة على المنصة نفسها؛ الموقع يستخدم ميزانية العضوي من التبويب اليومي؛ الشركاء والعلاقات العامة بلا إنفاق مباشر.',
     n5: 'جداول المدن من التبويب اليومي لتطابق الشيت الذي يملؤه الفريق يومياً.',
     n6: 'التغيّرات (▲▼) والملاحظات تقارن الفترة المحددة بالفترة المختارة في "قارن مع" (نفس عدد الأيام قبلها مباشرة، أو نفس الأيام من الشهر السابق)، وتتجاهل المصادر ذات الحجم القليل.',
-    n8: 'مستهدفات الإنفاق والعملاء من تبويب التوقعات: المستهدف الشهري لكل مدينة موزع بالتساوي على أيام الشهر. مستهدف الإنفاق هو ميزانية الإعلانات المباشرة (بدون المصاريف التسويقية العامة).',
+    n8: 'مستهدفات الإنفاق والعملاء من تبويب التوقعات: المستهدف الشهري لكل مدينة موزع بالتساوي على أيام الشهر. مستهدفات الإنفاق وتكلفة العميل تشمل حصة كل مجموعة من المصاريف التسويقية العامة (حسب الميزانية) كما في قسم الأداء؛ الإنفاق الفعلي هو الإنفاق الإعلاني المباشر من التبويب اليومي.',
     n7: 'أرقام حملات واتساب (المرسلة، المستلمة، المقروءة، العملاء، الإنفاق) من شيت تقرير أداء واتساب. النسب: المستلمة / المرسلة، المقروءة / المستلمة، العملاء / المستلمة.',
     inOdoo: 'في Odoo الآن:',
     tgtTD: 'المستهدف حتى تاريخه', tgtMonth: 'مستهدف الشهر', vsR: r => `مقارنة بـ ${r}`, tgtCpl: 'المستهدف', tgtLine: 'المستهدف اليومي', achieved: 'محقق', dayTotal: 'الإجمالي',
@@ -375,17 +375,19 @@ function weekStart(iso) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d
 // Lead targets from the Forecast tab: each city's monthly target spread evenly over the month (same rule as Performance)
 const GRP = ['paid', 'organic', 'wa'];
 const dimOf = mk => new Date(Date.UTC(+mk.slice(0, 4), +mk.slice(5, 7), 0)).getUTCDate();
+// a group's budget for a city plus its share of the city's marketing overhead (split by budget, same as Performance)
+const budOf = (c, g) => { const tot = GRP.reduce((a, k) => a + (c[k].budget || 0), 0); return (c[g].budget || 0) + (tot ? (c.overhead || 0) * (c[g].budget || 0) / tot : 0); };
 function targets(ds, from, to) {
   const T = { day: {}, sum: { paid: 0, organic: 0, wa: 0 }, spend: { paid: 0, organic: 0, wa: 0 }, month: { paid: 0, organic: 0, wa: 0 }, budget: { paid: 0, organic: 0, wa: 0 }, mLeads: { paid: 0, organic: 0, wa: 0 }, has: false };
   const fc = mk => ds.months && ds.months[mk] && ds.months[mk].forecast;
   for (let d = from; d <= to; d = addD(d, 1)) {
     const f = fc(d.slice(0, 7)); if (!f) continue;
     const days = f.daysInMonth || dimOf(d.slice(0, 7)), x = T.day[d] = { paid: 0, organic: 0, wa: 0 };
-    for (const c of f.cities) for (const g of GRP) { const v = (c[g].leads || 0) / days; x[g] += v; T.sum[g] += v; T.spend[g] += (c[g].budget || 0) / days; }
+    for (const c of f.cities) for (const g of GRP) { const v = (c[g].leads || 0) / days; x[g] += v; T.sum[g] += v; T.spend[g] += budOf(c, g) / days; }
     T.has = true;
   }
   const f = fc(to.slice(0, 7));
-  if (f) for (const c of f.cities) for (const g of GRP) { T.month[g] += c[g].leads || 0; T.mLeads[g] += c[g].leads || 0; T.budget[g] += c[g].budget || 0; }
+  if (f) for (const c of f.cities) for (const g of GRP) { T.month[g] += c[g].leads || 0; T.mLeads[g] += c[g].leads || 0; T.budget[g] += budOf(c, g); }
   return T;
 }
 // KPI card with its target inside: value, progress bar against the target to date, % achieved,
