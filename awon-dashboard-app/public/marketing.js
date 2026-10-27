@@ -6,6 +6,7 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 // ---------------- strings ----------------
 const T = {
   en: {
+    winTitle: 'Winning ads', winSub: 'Lowest cost per platform lead among lead-gen ads in the selected period', winLoading: 'Loading ad previews…', winNone: 'No ad qualified yet in this period.', winErr: 'Could not load ad previews', winMeta: 'Meta', winTiktok: 'TikTok', winSnapchat: 'Snapchat', winCpl: 'Cost per lead', winSpend: 'Spend', winLeads: 'Leads', winAvg: 'platform average', winMin: m => `Ads with at least ${m} spend`, winMerged: n => `${n} ads, same creative`, winNoThumb: 'No preview', winNote: 'Previews come straight from the ad platforms and refresh every 30 minutes. Same creative running in several ad sets or cities is combined. Meta leads count website leads and WhatsApp conversations.',
     insights: 'What changed and what to do', insightsSub: (a, b) => `Selected period compared with ${b}`,
     noInsights: 'No big moves against the previous period. Keep budgets steady and keep testing creatives.',
     paid: 'Paid ads', organic: 'Organic', wa: 'WhatsApp & CRM', cities: 'Cities (daily sheet view)', daily: 'Daily sheet',
@@ -62,6 +63,7 @@ const T = {
     aShift: (a, b) => `Shift 10 to 20% of ${b} budget to ${a} and review after 3 days.`,
   },
   ar: {
+    winTitle: 'الإعلانات الفائزة', winSub: 'أقل تكلفة لكل عميل محتمل من المنصة بين إعلانات توليد العملاء في الفترة المحددة', winLoading: 'جارٍ تحميل معاينات الإعلانات…', winNone: 'لا يوجد إعلان مؤهل في هذه الفترة بعد.', winErr: 'تعذّر تحميل معاينات الإعلانات', winMeta: 'ميتا', winTiktok: 'تيك توك', winSnapchat: 'سناب شات', winCpl: 'تكلفة العميل', winSpend: 'الإنفاق', winLeads: 'العملاء', winAvg: 'متوسط المنصة', winMin: m => `إعلانات أنفقت ${m} على الأقل`, winMerged: n => `${n} إعلانات بنفس التصميم`, winNoThumb: 'لا توجد معاينة', winNote: 'المعاينات تأتي مباشرة من منصات الإعلان وتتحدّث كل 30 دقيقة. التصميم نفسه عند تشغيله في عدة مجموعات أو مدن يُجمع معًا. عملاء ميتا يشملون عملاء الموقع ومحادثات واتساب.',
     insights: 'ما الذي تغيّر وماذا نفعل', insightsSub: (a, b) => `الفترة المحددة مقارنة بـ ${b}`,
     noInsights: 'لا تغيرات كبيرة مقارنة بالفترة السابقة. حافظوا على الميزانيات واستمروا في اختبار الإعلانات.',
     paid: 'الإعلانات المدفوعة', organic: 'العضوي', wa: 'واتساب وإعادة التفعيل', cities: 'المدن (عرض الشيت اليومي)', daily: 'الشيت اليومي',
@@ -636,8 +638,12 @@ function render({ ds, from, to, lang, perf, cmp }) {
     </div>
   </section>
 
+  <section><div class="sec-h"><h2>${t('winTitle')}</h2><p>${esc(t('winSub'))}</p></div><div id="winners" class="win-grid"><div class="win-msg">${esc(t('winLoading'))}</div></div></section>
+
   <section><div class="sec-h"><h2>${t('insights')}</h2><p>${esc(t('insightsSub')(n, `${pFrom} → ${pTo}`))}</p></div><div class="ins-grid">${insHtml}</div></section>
   <ul class="notes">${['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8'].map(k => `<li>${esc(t(k))}</li>`).join('')}${(ds.notes || []).map(e => `<li>${esc(e)}</li>`).join('')}${((ds.sources && ds.sources.ads && ds.sources.ads.errors) || []).map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
+
+  loadWinners(from, to);
 
   // --- charts
   const ds_ = Object.keys(C.days).filter(d => d >= from && d <= end).sort();
@@ -696,6 +702,38 @@ function render({ ds, from, to, lang, perf, cmp }) {
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.dataset.yAxisID === 'y' ? fN(c.raw) : '$' + fN(c.raw, 2)}` } } } } });
 
   $$('[data-mk]').forEach(b => b.addEventListener('click', () => { ui[b.dataset.mk] = b.dataset.v; saveUi(); render({ ds, from, to, lang, perf }); }));
+}
+
+
+// --- winning ads with previews (Meta, TikTok, Snapchat), loaded separately from /api/winners
+const winCache = new Map(); let winToken = 0;
+function winHtml(j) {
+  const names = { meta: t('winMeta'), tiktok: t('winTiktok'), snapchat: t('winSnapchat') };
+  return ['meta', 'tiktok', 'snapchat'].map(k => {
+    const p = j.platforms && j.platforms[k];
+    if (!p) return `<div class="win-col"><h3>${esc(names[k])}</h3><div class="win-msg">${esc(t('winErr'))}</div></div>`;
+    const cards = p.top.map((a, i) => {
+      const d = p.avgCpl && a.cpl ? (a.cpl - p.avgCpl) / p.avgCpl : null;
+      const dl = d == null ? '' : `<span class="dl ${d <= 0 ? 'good' : 'bad'}">${num((d > 0 ? '▲ ' : '▼ ') + fN(Math.abs(d) * 100, 0) + '%')}</span> <span class="win-avg">${esc(t('winAvg'))} ${num(fC(p.avgCpl))}</span>`;
+      const img = a.thumb ? `<img src="${esc(a.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'win-nt',textContent:this.dataset.nt}))" data-nt="${esc(t('winNoThumb'))}">` : `<div class="win-nt">${esc(t('winNoThumb'))}</div>`;
+      return `<div class="win-card"><div class="win-img">${img}<span class="win-rank">${i + 1}</span></div>
+        <div class="win-body"><div class="win-name" title="${esc(a.name)}">${esc(a.name || '-')}</div><div class="win-camp" title="${esc(a.campaign)}">${esc(a.campaign)}${a.ads > 1 ? ' · ' + esc(t('winMerged')(a.ads)) : ''}</div>
+        <div class="win-cpl"><span>${esc(t('winCpl'))}</span><b>${num(fC(a.cpl))}</b></div><div class="win-d">${dl}</div>
+        <div class="win-st"><span>${esc(t('winSpend'))} <b>${num(fC(a.spend))}</b></span><span>${esc(t('winLeads'))} <b>${num(fN(a.leads, a.leads % 1 ? 1 : 0))}</b></span></div></div></div>`;
+    }).join('');
+    return `<div class="win-col"><h3>${esc(names[k])} <small>${esc(t('winMin')(fC(p.minSpend)))}</small></h3>${cards || `<div class="win-msg">${esc(t('winNone'))}</div>`}</div>`;
+  }).join('') + `<p class="win-note">${esc(t('winNote'))}</p>`;
+}
+function loadWinners(from, to) {
+  const box = $('#winners'); if (!box) return;
+  const key = from + '|' + to, hit = winCache.get(key);
+  if (hit && Date.now() - hit.at < 25 * 60 * 1000) { box.innerHTML = winHtml(hit.j); return; }
+  const tok = ++winToken;
+  fetch(`/api/winners?from=${from}&to=${to}`).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))).then(j => {
+    if (j.error) throw new Error(j.error);
+    if (!(j.errors && j.errors.length)) winCache.set(key, { at: Date.now(), j });
+    if (tok !== winToken) return; const b = $('#winners'); if (b) b.innerHTML = winHtml(j);
+  }).catch(e => { if (tok !== winToken) return; const b = $('#winners'); if (b) b.innerHTML = `<div class="win-msg">${esc(t('winErr'))}: ${esc(e.message)}</div>`; });
 }
 
 window.AwonMkt = { render, _aggregate: aggregate, _insights: insights };
