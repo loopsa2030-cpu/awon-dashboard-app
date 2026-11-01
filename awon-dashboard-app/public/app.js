@@ -19,6 +19,7 @@ const T = {
     all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', custom: 'Pick dates…',
     cmpLbl: 'Compare to', cmpPrev: 'Previous period', cmpMonth: 'Same days last month', cmpOff: 'No comparison', cmpCustom: 'Custom dates…', cmpEdit: 'Change dates', cmpLen: (a, b) => `${a} days vs ${b} days, totals not adjusted`, vs: r => `vs ${r}`, cmpNone: 'no earlier data to compare',
     northStar: 'North star: cost per kg collected', perKg: 'per kg',
+    nsTitle: 'North stars', nsSub: 'The one number each team owns, and the three numbers that move it', nsEq: 'Cost per kg = cost per lead ÷ (pickup rate × kg per pickup)', nsAll: 'All marketing', nsCpl: 'Cost per lead', nsRate: 'Pickup rate', nsKpp: 'kg per pickup', nsTgt: 'target', nsOn: 'On target. Keep the mix as it is.', nsMain: (n, p) => `Biggest gap: ${n} (${p} off target)`, nsNo: 'No target for this period', nsOwn: { total: 'Everyone', paid: 'Paid team', organic: 'Organic team', wa: 'Retention (WhatsApp) team' }, nsLegend: 'Green: on target. Amber: within 10% of target. Red: more than 10% off.',
     marketing: 'Marketing', logistics: 'Logistics', vsTarget: 'Actual against the forecast, prorated to the last reported day',
     logiNote: 'Fridays are non-operating days in the target', platforms: 'Source groups',
     platNote: 'Group totals from the Daily tab; platform spend from Supermetrics; platform leads, pickups and kg from Odoo sources',
@@ -77,6 +78,7 @@ const T = {
     all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', custom: 'اختيار التواريخ…',
     cmpLbl: 'قارن مع', cmpPrev: 'الفترة السابقة', cmpMonth: 'نفس الأيام من الشهر السابق', cmpOff: 'بدون مقارنة', cmpCustom: 'تواريخ مخصصة…', cmpEdit: 'تغيير التواريخ', cmpLen: (a, b) => `${a} يوماً مقابل ${b} يوماً، الإجماليات بدون تعديل`, vs: r => `مقارنة بـ ${r}`, cmpNone: 'لا توجد بيانات سابقة للمقارنة',
     northStar: 'المؤشر الأساسي: تكلفة الكيلوغرام المجمّع', perKg: 'لكل كغ',
+    nsTitle: 'النورث ستارز', nsSub: 'الرقم الأساسي الذي يملكه كل فريق، والأرقام الثلاثة التي تحرّكه', nsEq: 'تكلفة الكيلو = تكلفة العميل ÷ (نسبة الاستلام × كغ لكل استلام)', nsAll: 'كل التسويق', nsCpl: 'تكلفة العميل', nsRate: 'نسبة الاستلام', nsKpp: 'كغ لكل استلام', nsTgt: 'المستهدف', nsOn: 'على المستهدف. حافظ على التوزيع الحالي.', nsMain: (n, p) => `أكبر فجوة: ${n} (${p} عن المستهدف)`, nsNo: 'لا يوجد مستهدف لهذه الفترة', nsOwn: { total: 'الجميع', paid: 'فريق المدفوع', organic: 'فريق الأورجنك', wa: 'فريق الاحتفاظ (واتساب)' }, nsLegend: 'أخضر: على المستهدف. أصفر: ضمن 10% من المستهدف. أحمر: أبعد من 10%.',
     marketing: 'التسويق', logistics: 'اللوجستيات', vsTarget: 'الفعلي مقابل المستهدف حتى آخر يوم مُسجّل',
     logiNote: 'أيام الجمعة غير تشغيلية في المستهدف', platforms: 'مجموعات المصادر',
     platNote: 'إجماليات المجموعات من التبويب اليومي، وإنفاق المنصات من Supermetrics، وعملاء المنصات من مصادر Odoo',
@@ -143,6 +145,28 @@ const num = s => `<span class="num">${s}</span>`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // status: kind = 'cost' (lower is better) | 'volume' (higher is better) | 'pace' (close is better)
+
+// North stars: cost per kg per team, with the three drivers (cost per lead, pickup rate, kg per pickup) and the biggest gap
+function renderNorthStars(perf, perfC) {
+  const box = $('#northStars'); if (!box) return;
+  const rows = [['total', perf.totals, perfC && perfC.totals], ...['paid', 'organic', 'wa'].map(g => [g, perf.groups[g], perfC && perfC.groups[g]])];
+  const drv = (lbl, a, tg, kind, fmt) => {
+    const st = status(a, tg, kind);
+    return `<div class="ns-d ${st}"><span class="l">${esc(lbl)}</span><span class="v">${a == null ? '-' : num(fmt(a))}</span><span class="t">${tg ? esc(t('nsTgt')) + ' ' + num(fmt(tg)) : ''}</span></div>`;
+  };
+  box.innerHTML = rows.map(([g, x, c]) => {
+    const st = status(x.cpk, x.cpkT, 'cost');
+    // gap decomposition: ln(cpk/cpkT) = ln(cpl/cplT) - ln(rate/rateT) - ln(kgpp/kgppT)
+    const parts = [[t('nsCpl'), x.cpl && x.cplT ? Math.log(x.cpl / x.cplT) : 0, x.cpl / x.cplT - 1], [t('nsRate'), x.pickupRate && x.pickupRateT ? -Math.log(x.pickupRate / x.pickupRateT) : 0, x.pickupRateT / x.pickupRate - 1], [t('nsKpp'), x.kgPerPickup && x.kgPerPickupT ? -Math.log(x.kgPerPickup / x.kgPerPickupT) : 0, x.kgPerPickupT / x.kgPerPickup - 1]];
+    const worst = parts.sort((a, b) => b[1] - a[1])[0];
+    const diag = !x.cpkT ? t('nsNo') : st === 'good' ? t('nsOn') : (worst && worst[1] > 0.005 ? t('nsMain')(worst[0], fmtP(Math.abs(worst[2]))) : '');
+    return `<div class="ns-card ${st}"><div class="ns-h"><h3>${esc(g === 'total' ? t('nsAll') : t(g))}</h3><span class="own">${esc(t('nsOwn')[g])}</span></div>
+      <div class="ns-star"><span class="l">${esc(t('northStar'))}</span><span class="v cpk-cell ${st}">${fmtC(x.cpk)}</span><span class="t">${x.cpkT ? esc(t('nsTgt')) + ' ' + num(fmtC(x.cpkT)) : ''}${c ? ' · ' + esc(cmpShort()) + ' ' + (dchg(x.cpk, c.cpk, 'cost') || '-') : ''}</span></div>
+      <div class="ns-drv">${drv(t('nsCpl'), x.cpl, x.cplT, 'cost', fmtC)}<i>÷</i>${drv(t('nsRate'), x.pickupRate, x.pickupRateT, 'volume', fmtP)}<i>×</i>${drv(t('nsKpp'), x.kgPerPickup, x.kgPerPickupT, 'volume', v => fmtN(v, 1))}</div>
+      <p class="ns-diag">${esc(diag)}</p></div>`;
+  }).join('') + `<p class="ns-eq">${esc(t('nsEq'))} · ${esc(t('nsLegend'))}</p>`;
+}
+
 function status(a, tgt, kind) {
   if (a == null || tgt == null || !tgt) return '';
   const r = a / tgt;
@@ -327,6 +351,7 @@ function renderPerf() {
   // north star sentence under the group cards
   const diff = T0.cpkT ? T0.cpk / T0.cpkT - 1 : null;
   const p = diff == null ? '' : (diff > 0 ? t('over')(num(fmtN(diff * 100, 0) + '%')) : t('under')(num(fmtN(-diff * 100, 0) + '%')));
+  renderNorthStars(perf, perfC);
   $('#cpkTxt').innerHTML = T0.cpkT ? esc(t('northStar')) + '. ' + t('cpkLine')(fmtC(T0.cpk), num(fmtC(T0.cpkT)), p) : '';
   $('#groups').innerHTML = ['paid', 'organic', 'wa'].map(g => {
     const x = G[g]; const s = status(x.cpk, x.cpkT, 'cost');

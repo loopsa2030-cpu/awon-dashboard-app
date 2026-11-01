@@ -6,6 +6,7 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 // ---------------- strings ----------------
 const T = {
   en: {
+    stLegend: 'Colour code against the target: green on target, amber within 10%, red more than 10% off. Cost per lead is compared with the month target (budget ÷ target leads).',
     winTitle: 'Winning ads', winSub: 'Lowest cost per platform lead among lead-gen ads in the selected period', winLoading: 'Loading ad previews…', winNone: 'No ad qualified yet in this period.', winErr: 'Could not load ad previews', winMeta: 'Meta', winTiktok: 'TikTok', winSnapchat: 'Snapchat', winCpl: 'Cost per lead', winSpend: 'Spend', winLeads: 'Leads', winAvg: 'platform average', winMin: m => `Ads with at least ${m} spend`, winMerged: n => `${n} ads, same creative`, winNoThumb: 'No preview', winNote: 'Previews come straight from the ad platforms and refresh every 30 minutes. Same creative running in several ad sets or cities is combined. Meta leads count website leads and WhatsApp conversations.',
     insights: 'What changed and what to do', insightsSub: (a, b) => `Selected period compared with ${b}`,
     noInsights: 'No big moves against the previous period. Keep budgets steady and keep testing creatives.',
@@ -63,6 +64,7 @@ const T = {
     aShift: (a, b) => `Shift 10 to 20% of ${b} budget to ${a} and review after 3 days.`,
   },
   ar: {
+    stLegend: 'التمييز اللوني مقابل المستهدف: أخضر على المستهدف، أصفر ضمن 10%، أحمر أبعد من 10%. تكلفة العميل تُقارن بمستهدف الشهر (الميزانية ÷ العملاء المستهدفين).',
     winTitle: 'الإعلانات الفائزة', winSub: 'أقل تكلفة لكل عميل محتمل من المنصة بين إعلانات توليد العملاء في الفترة المحددة', winLoading: 'جارٍ تحميل معاينات الإعلانات…', winNone: 'لا يوجد إعلان مؤهل في هذه الفترة بعد.', winErr: 'تعذّر تحميل معاينات الإعلانات', winMeta: 'ميتا', winTiktok: 'تيك توك', winSnapchat: 'سناب شات', winCpl: 'تكلفة العميل', winSpend: 'الإنفاق', winLeads: 'العملاء', winAvg: 'متوسط المنصة', winMin: m => `إعلانات أنفقت ${m} على الأقل`, winMerged: n => `${n} إعلانات بنفس التصميم`, winNoThumb: 'لا توجد معاينة', winNote: 'المعاينات تأتي مباشرة من منصات الإعلان وتتحدّث كل 30 دقيقة. التصميم نفسه عند تشغيله في عدة مجموعات أو مدن يُجمع معًا. عملاء ميتا يشملون عملاء الموقع ومحادثات واتساب.',
     insights: 'ما الذي تغيّر وماذا نفعل', insightsSub: (a, b) => `الفترة المحددة مقارنة بـ ${b}`,
     noInsights: 'لا تغيرات كبيرة مقارنة بالفترة السابقة. حافظوا على الميزانيات واستمروا في اختبار الإعلانات.',
@@ -369,8 +371,8 @@ function chart(id, cfg) {
 const chips = (key, opts) => `<div class="trend-tabs">${opts.map(([v, lbl]) => `<button class="chip" data-mk="${key}" data-v="${v}" aria-pressed="${ui[key] === v}">${esc(lbl)}</button>`).join('')}</div>`;
 
 // ---------------- render ----------------
-function kpi(label, val, d, sub) {
-  return `<div class="kpi"><div class="k">${esc(label)}</div><div class="v">${num(val)}</div><div class="t"><span>${sub ? esc(sub) : ''}</span>${d || ''}</div></div>`;
+function kpi(label, val, d, sub, st) {
+  return `<div class="kpi${st ? ' st-' + st : ''}"><div class="k">${esc(label)}</div><div class="v">${num(val)}</div><div class="t"><span>${sub ? esc(sub) : ''}</span>${d || ''}</div></div>`;
 }
 function weekStart(iso) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0, 10); }
 
@@ -406,6 +408,8 @@ function tgtCard(label, T, g, what, actual, d) {
     <div class="t tgt-line"><span>${esc(t('tgtTD'))} <b>${num(fmt(tg))}</b></span><span class="dl ${st}">${num(fP(r, 0))} ${esc(t('achieved'))}</span></div>
     <div class="t"><span>${esc(t('tgtMonth'))} ${num(fmt(mt))}</span>${d || ''}</div></div>`;
 }
+// Colour code for cost per lead against the month target CPL (budget / leads): green on target, amber within 10%, red beyond
+const cplSt = (T, g, a) => { const tg = T.mLeads[g] && T.budget[g] ? T.budget[g] / T.mLeads[g] : 0; if (!T.has || !tg || a == null || !isFinite(a)) return ''; const r = a / tg; return r <= 1.02 ? 'good' : r <= 1.1 ? 'warn' : 'bad'; };
 const tgtCplTxt = (T, g) => (T.mLeads[g] && T.budget[g] ? t('tgtCpl') + ' ' + fC(T.budget[g] / T.mLeads[g]) : '');
 // Chart.js plugin: writes the stacked total above each day's bar
 const stackTotals = { id: 'stackTotals', afterDatasetsDraw(ch) {
@@ -574,12 +578,13 @@ function render({ ds, from, to, lang, perf, cmp }) {
     return `<td style="background:${r < 0 ? `rgba(12,163,157,${(0.06 + a * 0.5).toFixed(2)})` : `rgba(181,78,55,${(0.05 + a * 0.4).toFixed(2)})`}">${num(fC(v))}<span class="sub">${num(fN(x.crm))}</span></td>`; };
 
   root.innerHTML = `${srcWarn(ds)}
+  <p class="st-legend"><i class="g"></i><i class="w"></i><i class="b"></i>${esc(t('stLegend'))}</p>
   <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(vsTxt)}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
     <div class="kpis">
       ${tgtCard(t('spend'), T, 'paid', 'spend', pt.spend, delta(pt.spend, pp.spend, 'neutral'))}
       ${tgtCard(t('crmLeads'), T, 'paid', 'leads', pt.crm, delta(pt.crm, pp.crm, 'up', 5))}
       ${kpi(t('nativeLeads'), fN(pt.native), delta(pt.native, pp.native, 'up', 5))}
-      ${kpi(t('crmCpl'), fC(div(pt.spend, pt.crm)), delta(div(pt.spend, pt.crm), div(pp.spend, pp.crm), 'down'), tgtCplTxt(T, 'paid'))}
+      ${kpi(t('crmCpl'), fC(div(pt.spend, pt.crm)), delta(div(pt.spend, pt.crm), div(pp.spend, pp.crm), 'down'), tgtCplTxt(T, 'paid'), cplSt(T, 'paid', div(pt.spend, pt.crm)))}
       ${kpi(t('nativeCpl'), fC(div(pt.spend, pt.native)), delta(div(pt.spend, pt.native), div(pp.spend, pp.native), 'down'))}
       ${kpi(t('paidVisits'), fN(pt.visits), delta(pt.visits, pp.visits))}
       ${kpi(t('cvr'), fP(div(pt.crm, pt.visits), 2), delta(div(pt.crm, pt.visits), div(pp.crm, pp.visits)))}
@@ -597,7 +602,7 @@ function render({ ds, from, to, lang, perf, cmp }) {
       ${kpi(t('orgVisits'), fN(ot.visits), delta(ot.visits, op.visits))}
       ${kpi(t('cvr'), fP(div(ot.webLeads, ot.visits), 2), delta(div(ot.webLeads, ot.visits), div(op.webLeads, op.visits)))}
       ${tgtCard(t('leads'), T, 'organic', 'leads', ot.leads, delta(ot.leads, op.leads, 'up', 5))}
-      ${kpi(t('cpl'), fC(div(ot.spend, ot.leads)), delta(div(ot.spend, ot.leads), div(op.spend, op.leads), 'down'), tgtCplTxt(T, 'organic'))}
+      ${kpi(t('cpl'), fC(div(ot.spend, ot.leads)), delta(div(ot.spend, ot.leads), div(op.spend, op.leads), 'down'), tgtCplTxt(T, 'organic'), cplSt(T, 'organic', div(ot.spend, ot.leads)))}
     </div>
     <div class="panel" style="margin-top:14px"><div class="tbl-wrap"><table class="mk"><thead><tr><th>${t('source')}</th><th>${t('leads')}</th><th>${t('share')}</th><th>${t('orgVisits')}</th><th>${t('cvr')}</th><th>${t('spend')}</th><th>${t('cpl')}</th></tr></thead>
       <tbody>${orgRows}</tbody><tfoot><tr><td>${esc(t('total'))}</td><td>${num(fN(ot.leads))}${delta(ot.leads, op.leads, 'up', 5)}</td><td>100%</td><td>${num(fN(ot.visits))}</td><td>${num(fP(div(ot.webLeads, ot.visits), 2))}</td><td>${num(fU(ot.spend))}</td><td>${num(fC(div(ot.spend, ot.leads)))}</td></tr></tfoot></table></div></div>
@@ -608,7 +613,7 @@ function render({ ds, from, to, lang, perf, cmp }) {
     <div class="kpis">
       ${tgtCard(t('spend'), T, 'wa', 'spend', C.wa.spend, delta(C.wa.spend, P.wa.spend, 'neutral'))}
       ${tgtCard(t('crmLeads'), T, 'wa', 'leads', C.wa.crm, delta(C.wa.crm, P.wa.crm, 'up', 5))}
-      ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'), tgtCplTxt(T, 'wa'))}
+      ${kpi(t('cpl'), fC(div(C.wa.spend, C.wa.crm)), delta(div(C.wa.spend, C.wa.crm), div(P.wa.spend, P.wa.crm), 'down'), tgtCplTxt(T, 'wa'), cplSt(T, 'wa', div(C.wa.spend, C.wa.crm)))}
     </div>
     <div class="panel trend-panel" style="margin-top:14px"><div class="trend-cw"><canvas id="mkWa"></canvas></div></div>
     ${waRepHtml}
