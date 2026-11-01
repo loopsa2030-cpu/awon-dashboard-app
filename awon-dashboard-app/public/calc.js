@@ -41,16 +41,24 @@
     const rows = [];
     const logisticsMonths = new Set();
     let lastReported = null;
+    // A day only counts once its Paid columns are filled in the Daily tab: when the ad platforms spent that day but the
+    // sheet still shows no Paid spend or leads, the day is left out so spend, leads and kg all cover the same days.
+    const paidDay = {}, adsDay = {};
+    for (const m of Object.values(ds.months)) for (const r of m.rows) paidDay[r[0]] = (paidDay[r[0]] || 0) + r[2] + r[3];
+    for (const p of PLATS) for (const a of (ds.ads.platforms[p] || [])) adsDay[a[0]] = (adsDay[a[0]] || 0) + a[1];
+    const unfilled = new Set();
     for (const [mk, m] of Object.entries(ds.months)) {
       if (m.rows.some(r => r[8] > 0 || r[9] > 0)) logisticsMonths.add(mk);
       if (mk < from.slice(0, 7) || mk > to.slice(0, 7)) continue;
       for (const r of m.rows) {
         if (r[0] < from || r[0] > to) continue;
+        if (!paidDay[r[0]] && adsDay[r[0]] > 50) { unfilled.add(r[0]); continue; }
         rows.push(r);
         if (!lastReported || r[0] > lastReported) lastReported = r[0];
       }
     }
     const targetEnd = lastReported && lastReported < to ? lastReported : to;
+    if (unfilled.size) { const u = [...unfilled].sort(); notes.push(`Paid spend and leads are not filled in the Daily tab yet for ${u.length > 3 ? u[0] + ' to ' + u[u.length - 1] : u.join(', ')}; those days are left out so spend, leads and kg cover the same days.`); }
 
     const oKg = {}, oWon = {}, oLog = {};
     const plat = Object.fromEntries(PLATS.map(p => [p, { crmLeads: 0, pickups: 0, weight: 0 }]));
@@ -249,7 +257,7 @@
     return {
       range: { from, to, lastReported, targetEnd, firstAvailable: first },
       sources: { sheets: { ...ds.sources.sheets, tabs }, odoo: ds.sources.odoo, ads: ds.sources.ads },
-      totals: total, monthTargets: mt, groups, cities: cityList, platforms, branding, brandingMoved, donors, overheadT, overheadA,
+      totals: total, monthTargets: mt, groups, cities: cityList, platforms, branding, brandingMoved, donors, overheadT, overheadA, unfilled: [...unfilled].sort(),
       reconciliation: { sheetPaidSpend: groups.paid.spend, adPlatformsSpend: adsTotal },
       series: seriesList, notes, generatedAt: ds.generatedAt,
     };

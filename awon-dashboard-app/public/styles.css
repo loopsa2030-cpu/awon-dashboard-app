@@ -327,3 +327,5 @@ td .dl{white-space:nowrap}
 .kpi.st-good .v{color:#0a7f7a}.kpi.st-warn .v{color:#a8700f}.kpi.st-bad .v{color:var(--brick)}
 .st-legend{display:flex;align-items:center;gap:6px;margin:0 0 14px;color:var(--muted);font-size:12.5px}
 .st-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}.st-legend .g{background:var(--teal)}.st-legend .w{background:var(--gold)}.st-legend .b{background:var(--brick);margin-inline-end:6px}
+
+.err.warnbar{color:#7a4a00;background:#fff7e6;border-color:#f0d9a8}

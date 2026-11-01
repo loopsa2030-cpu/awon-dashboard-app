@@ -257,6 +257,10 @@ function recompute() {
   perfC = dataset && cmpR ? AwonCalc.compute(dataset, cmpR.from, cmpR.to) : null;
   if (perfC && !perfC.range.lastReported) perfC = null;
   if (perf && !perf.range.lastReported && !dataErr) $('#perfErr').innerHTML = `<div class="err" style="color:var(--muted);background:#fff;border-color:var(--line)">${esc(lang === 'ar' ? 'لا توجد بيانات مسجلة لهذه الفترة بعد: يُحدَّث الشيت يومياً.' : 'Nothing reported for this period yet: the sheet is updated daily.')}</div>`;
+  if (perf && perf.unfilled && perf.unfilled.length) {
+    const u = perf.unfilled, rng = u.length > 3 ? `${u[0]} → ${u[u.length - 1]}` : u.join(', ');
+    $('#perfErr').innerHTML += `<div class="err warnbar">${esc(lang === 'ar' ? `إنفاق وعملاء الإعلانات المدفوعة غير مُدخلين بعد في التبويب اليومي للأيام: ${rng}. استُبعدت هذه الأيام حتى تغطي الأرقام نفس الأيام.` : `Paid spend and leads are not filled in the Daily tab yet for ${rng}. Those days are left out so spend, leads and kg cover the same days.`)}</div>`;
+  }
   syncHeat(false);
   render();
   if (!$('#view-map').hidden) ensureHeat();
