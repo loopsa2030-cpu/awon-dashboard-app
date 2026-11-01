@@ -266,7 +266,11 @@
   function cmpRange(mode, from, end, first) {
     if (!mode || mode === 'off' || !from || !end || end < from) return null;
     let a, b;
-    if (mode === 'month') {
+    const fromMonthStart = from.slice(8) === '01' && from.slice(0, 7) === end.slice(0, 7);
+    if (mode === 'prev' && fromMonthStart) {      // a month (or its first days) compares with the same days of the month before
+      a = shiftMonth(from, -1); b = shiftMonth(end, -1);
+      if (+end.slice(8) === dim(end.slice(0, 7))) b = b.slice(0, 8) + String(dim(b.slice(0, 7))).padStart(2, '0');
+    } else if (mode === 'month') {
       a = shiftMonth(from, -1); b = shiftMonth(end, -1);
       if (+end.slice(8) === dim(end.slice(0, 7))) b = b.slice(0, 8) + String(dim(b.slice(0, 7))).padStart(2, '0');   // month end maps to month end
     } else {

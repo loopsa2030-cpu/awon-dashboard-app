@@ -16,7 +16,7 @@ const T = {
     volNote: 'Dashed lines are the daily targets; the pickup target is spread over operating days only (no Fridays).',
     title: 'Performance dashboard', subtitle: 'Marketing, logistics and donors across Saudi Arabia',
     refresh: 'Refresh', tabPerf: 'Performance', tabMkt: 'Marketing', tabMap: 'Donor map',
-    all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', custom: 'Pick dates…',
+    all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', lastMonth: 'Last month', custom: 'Pick dates…',
     cmpLbl: 'Compare to', cmpPrev: 'Previous period', cmpMonth: 'Same days last month', cmpOff: 'No comparison', cmpCustom: 'Custom dates…', cmpEdit: 'Change dates', cmpLen: (a, b) => `${a} days vs ${b} days, totals not adjusted`, vs: r => `vs ${r}`, cmpNone: 'no earlier data to compare',
     northStar: 'North star: cost per kg collected', perKg: 'per kg',
     nsTitle: 'North stars', nsSub: 'The one number each team owns, and the three numbers that move it', nsEq: 'Cost per kg = cost per lead ÷ (pickup rate × kg per pickup)', nsAll: 'All marketing', nsCpl: 'Cost per lead', nsRate: 'Pickup rate', nsKpp: 'kg per pickup', nsTgt: 'target', nsOn: 'On target. Keep the mix as it is.', nsMain: (n, p) => `Biggest gap: ${n} (${p} off target)`, nsNo: 'No target for this period', nsOwn: { total: 'Everyone', paid: 'Paid team', organic: 'Organic team', wa: 'Retention (WhatsApp) team' }, nsLegend: 'Green: on target. Amber: within 10% of target. Red: more than 10% off.',
@@ -76,7 +76,7 @@ const T = {
     volNote: 'الخطوط المتقطعة هي المستهدف اليومي؛ مستهدف الاستلامات موزع على أيام التشغيل فقط (بدون الجمعة).',
     title: 'لوحة الأداء', subtitle: 'التسويق واللوجستيات والمتبرعون في المملكة',
     refresh: 'تحديث', tabPerf: 'الأداء', tabMkt: 'التسويق', tabMap: 'خريطة المتبرعين',
-    all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', custom: 'اختيار التواريخ…',
+    all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', lastMonth: 'الشهر الماضي', custom: 'اختيار التواريخ…',
     cmpLbl: 'قارن مع', cmpPrev: 'الفترة السابقة', cmpMonth: 'نفس الأيام من الشهر السابق', cmpOff: 'بدون مقارنة', cmpCustom: 'تواريخ مخصصة…', cmpEdit: 'تغيير التواريخ', cmpLen: (a, b) => `${a} يوماً مقابل ${b} يوماً، الإجماليات بدون تعديل`, vs: r => `مقارنة بـ ${r}`, cmpNone: 'لا توجد بيانات سابقة للمقارنة',
     northStar: 'المؤشر الأساسي: تكلفة الكيلوغرام المجمّع', perKg: 'لكل كغ',
     nsTitle: 'النورث ستارز', nsSub: 'الرقم الأساسي الذي يملكه كل فريق، والأرقام الثلاثة التي تحرّكه', nsEq: 'تكلفة الكيلو = تكلفة العميل ÷ (نسبة الاستلام × كغ لكل استلام)', nsAll: 'كل التسويق', nsCpl: 'تكلفة العميل', nsRate: 'نسبة الاستلام', nsKpp: 'كغ لكل استلام', nsTgt: 'المستهدف', nsOn: 'على المستهدف. حافظ على التوزيع الحالي.', nsMain: (n, p) => `أكبر فجوة: ${n} (${p} عن المستهدف)`, nsNo: 'لا يوجد مستهدف لهذه الفترة', nsOwn: { total: 'الجميع', paid: 'فريق المدفوع', organic: 'فريق الأورجنك', wa: 'فريق الاحتفاظ (واتساب)' }, nsLegend: 'أخضر: على المستهدف. أصفر: ضمن 10% من المستهدف. أحمر: أبعد من 10%.',
@@ -188,7 +188,7 @@ let cmpMode = (() => { try { return localStorage.getItem('awon-cmp') || 'prev'; 
 let cmpCustom = (() => { try { return JSON.parse(localStorage.getItem('awon-cmp-custom') || 'null'); } catch (e) { return null; } })();
 if (cmpMode === 'custom' && !cmpCustom) cmpMode = 'prev';
 const nDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1;
-let cmpR = null, perfC = null, heatC = null, cmpLen = null;
+let cmpR = null, perfC = null, heatC = null, heatCFail = false, cmpLen = null;
 const fmtDay = d => new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(d + 'T00:00:00Z')).replace('Sept', 'Sep');
 const fmtRange = (a, b) => a === b ? fmtDay(a) : a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${fmtDay(b)}` : `${fmtDay(a)} – ${fmtDay(b)}`;
 const cmpShort = () => cmpR ? t('vs')(fmtRange(cmpR.from, cmpR.to)) : '';
@@ -208,6 +208,7 @@ function resolve(s) {
     case 'yesterday': { const y = addD(tdy, -1); return { from: y, to: y }; }
     case '7d': return { from: addD(tdy, -7), to: addD(tdy, -1) };
     case 'month': return { from: tdy.slice(0, 8) + '01', to: tdy };
+    case 'lastmonth': { const f = new Date(Date.UTC(+tdy.slice(0, 4), +tdy.slice(5, 7) - 2, 1)); return { from: f.toISOString().slice(0, 10), to: addD(tdy.slice(0, 8) + '01', -1) }; }
     default: return { from: s.from, to: s.to };
   }
 }
@@ -224,7 +225,7 @@ async function getJSON(u) {
 // Data flow: /api/dataset is fetched once (and every 5 min); every timeframe is then computed in the
 // browser, so switching dates is instant. The map fetches per range, lazily, and caches per range.
 let dataset = null, dataErr = null, updating = false;
-const heatCache = new Map();
+const heatCache = new Map(), heatFail = new Map();
 // The last dataset is kept in this browser (Cache Storage), so the dashboard opens instantly with it
 // while the fresh copy loads in the background. Nothing here is required: if storage is blocked it just loads normally.
 const DS_CACHE = 'awon-dataset-v1', DS_KEY = '/api/dataset';
@@ -264,6 +265,7 @@ function syncHeat(draw) {
   const { from, to } = resolve(state);
   heat = heatCache.get(from + '|' + to) || null;
   heatC = cmpR ? heatCache.get(cmpR.from + '|' + cmpR.to) || null : null;
+  heatCFail = !!(cmpR && heatFail.get(cmpR.from + '|' + cmpR.to));
   if (draw) renderMap();
 }
 function ensureHeat() {
@@ -277,7 +279,8 @@ async function loadHeat(key, from, to, main) {
   if (main) $('#mapNotes').innerHTML = `<li>${esc(lang === 'ar' ? 'جارٍ تحميل الخريطة…' : 'Loading map…')}</li>`;
   let h;
   try { h = await getJSON(`/api/heatmap?from=${from}&to=${to}`); } catch (e) { h = { error: e.message, points: [] }; }
-  heatCache.set(key, h);
+  if (h.error) heatCache.delete(key); else heatCache.set(key, h);   // a failed fetch is retried next time instead of staying broken
+  heatFail.set(key, !!h.error);
   syncHeat(true);
 }
 async function load(force) { await fetchDataset(force); if (force) heatCache.clear(); recompute(); }
@@ -607,7 +610,7 @@ function renderMap() {
   const ctot = cPts ? sumPts(cPts) : null;
   const pkey = p => p.city + '|' + p.en;
   const cIdx = cPts ? new Map(cPts.map(p => [pkey(p), p])) : null;
-  const mrow = (cur, prev) => !cmpR ? '' : `<div class="t cmp"><span>${esc(cmpShort())}</span>${ctot ? dchg(cur, prev, 'volume') || '<span class="dl flat">-</span>' : '<span class="dl flat">…</span>'}</div>`;
+  const mrow = (cur, prev) => !cmpR ? '' : `<div class="t cmp"><span>${esc(cmpShort())}</span>${ctot ? dchg(cur, prev, 'volume') || '<span class="dl flat">-</span>' : (heatCFail ? '<span class="dl flat">-</span>' : '<span class="dl flat">…</span>')}</div>`;
   $('#mapStats').innerHTML = `<div class="kpi"><div class="k">${t('donationsRec')}</div><div class="v">${num(fmtN(tot.d))}</div>${mrow(tot.d, ctot && ctot.d)}</div>
     <div class="kpi"><div class="k">${t('totalKg')}</div><div class="v">${num(fmtN(tot.k))}</div>${mrow(tot.k, ctot && ctot.k)}</div>
     <div class="kpi"><div class="k">${t('districts')}</div><div class="v">${num(fmtN(tot.n))}</div>${mrow(tot.n, ctot && ctot.n)}</div>`;
@@ -714,7 +717,7 @@ function showTab(which) {
 function renderMkt() {
   if (!window.AwonMkt || $('#view-mkt').hidden) return;
   const { from, to } = resolve(state);
-  try { $('#mktErr').innerHTML = ''; AwonMkt.render({ ds: dataset, from, to, lang, perf, cmp: cmpMode === 'custom' ? (cmpR || 'off') : cmpMode }); } catch (e) { console.error(e); $('#mktErr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  try { $('#mktErr').innerHTML = ''; AwonMkt.render({ ds: dataset, from, to, lang, perf, cmp: cmpMode === 'off' ? 'off' : (cmpR || 'off') }); } catch (e) { console.error(e); $('#mktErr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 $('#tab-perf').addEventListener('click', () => showTab('perf'));
 $('#tab-mkt').addEventListener('click', () => showTab('mkt'));
