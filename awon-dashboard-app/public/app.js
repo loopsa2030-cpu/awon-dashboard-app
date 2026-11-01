@@ -60,7 +60,8 @@ const T = {
     monthGran: m => `Snapshot mode only holds ${m} (top 320 districts); connect Odoo for exact dates and all districts.`,
     srcLine: (k, m, t) => `${k}: ${m}${t ? ' (' + t + ')' : ''}`,
     srcSheets: 'Google Sheets (Daily + Forecast tabs)', srcOdoo: 'Odoo CRM', srcAds: 'Supermetrics',
-    overheadNote: 'Targets include marketing overhead from the forecast, matching the MTD tab. Actual spend is direct media spend from the Daily tab.',
+    overheadNote: 'Targets include marketing overhead from the forecast. Actual spend is media spend from the Daily tab plus the actual monthly overhead entered in the MTD tab at month end (prorated by day, shown separately).',
+    ovhIncl: 'incl. overhead', ovhLbl: 'Overhead', ovhShare: p => `${p} of total spend`, ovhNone: 'Added at month end (MTD tab)',
     dates: (a, b) => a === b ? a : `${a} → ${b}`, lastRep: d => `last reported day ${d}`,
     series: { spend: 'Spend', target: 'Spend target', kg: 'kg', cpk: 'CPK (7-day rolling)' },
   },
@@ -119,7 +120,8 @@ const T = {
     monthGran: m => `وضع اللقطة يحتوي على ${m} فقط (أعلى ٣٢٠ حياً)؛ اربط Odoo لعرض كل التواريخ والأحياء.`,
     srcLine: (k, m, t) => `${k}: ${m}${t ? ' (' + t + ')' : ''}`,
     srcSheets: 'Google Sheets (التبويب اليومي والتوقعات)', srcOdoo: 'Odoo CRM', srcAds: 'Supermetrics',
-    overheadNote: 'المستهدف يشمل المصاريف التسويقية العامة من التوقعات كما في تبويب MTD، بينما الإنفاق الفعلي هو إنفاق الوسائط من التبويب اليومي.',
+    overheadNote: 'المستهدف يشمل المصاريف التسويقية العامة من التوقعات. الإنفاق الفعلي هو إنفاق الوسائط من التبويب اليومي مضافاً إليه المصاريف العامة الفعلية المدخلة في تبويب MTD نهاية الشهر (موزعة يومياً وتظهر بشكل منفصل).',
+    ovhIncl: 'شامل المصاريف العامة', ovhLbl: 'المصاريف العامة', ovhShare: p => `${p} من إجمالي الإنفاق`, ovhNone: 'تضاف نهاية الشهر (تبويب MTD)',
     dates: (a, b) => a === b ? a : `${a} ← ${b}`, lastRep: d => `آخر يوم مسجل ${d}`,
     series: { spend: 'الإنفاق', target: 'مستهدف الإنفاق', kg: 'كغ', cpk: 'تكلفة الكيلو (متوسط ٧ أيام)' },
   },
@@ -331,7 +333,7 @@ function renderPerf() {
   const T0 = perf.totals, G = perf.groups;
   // headline: total weight, spend and CPK against the prorated target
   const MT = perf.monthTargets || {};
-  const hl = (label, val, tg, fmt, kind, main, unit, mtv, cv) => {
+  const hl = (label, val, tg, fmt, kind, main, unit, mtv, cv, extra) => {
     const st = status(val, tg, kind);
     const r = tg ? val / tg : null;
     const pct = r == null ? 0 : Math.max(0, Math.min(100, r * 100));
@@ -341,11 +343,11 @@ function renderPerf() {
       <div class="v">${num(fmt(val))}${unit ? `<small>${esc(unit)}</small>` : ''}</div>
       <div class="bar"><i class="${st}" style="width:${pct}%"></i></div>
       <div class="t"><span>${esc(t('toDate'))} <b>${num(fmt(tg))}</b></span>${kind !== 'cost' && r != null ? `<span>${t('hlPace')(num(fmtN(r * 100, 0) + '%'))}</span>` : ''}</div>
-      ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} <b>${num(fmt(mtv))}</b></span>${kind !== 'cost' && mtv ? `<span>${t('hlPace')(num(fmtN(val / mtv * 100, 0) + '%'))}</span>` : ''}</div>` : ''}${cv !== undefined ? cmpRow(val, cv, kind === 'pace' ? 'neutral' : kind) : ''}</div>`;
+      ${mtv != null ? `<div class="t mt"><span>${esc(mtLabel())} <b>${num(fmt(mtv))}</b></span>${kind !== 'cost' && mtv ? `<span>${t('hlPace')(num(fmtN(val / mtv * 100, 0) + '%'))}</span>` : ''}</div>` : ''}${cv !== undefined ? cmpRow(val, cv, kind === 'pace' ? 'neutral' : kind) : ''}${extra || ''}</div>`;
   };
   $('#headline').innerHTML = [
     hl(t('hlWeight'), T0.weight, T0.weightT, v => fmtN(v), 'volume', 'teal', lang === 'ar' ? 'كغ' : 'kg', MT.weight, pc(p => p.totals.weight)),
-    hl(t('hlSpend'), T0.spend, T0.spendT, v => fmtUSD(v, 0), 'pace', 'soft', '', MT.spend, pc(p => p.totals.spend)),
+    hl(t('hlSpend'), T0.spend, T0.spendT, v => fmtUSD(v, 0), 'pace', 'soft', '', MT.spend, pc(p => p.totals.spend), T0.overhead ? `<div class="t ovh"><span>${esc(t('ovhIncl'))} <b>${num(fmtUSD(T0.overhead, 0))}</b></span></div>` : ''),
     hl(t('hlCpk'), T0.cpk, T0.cpkT, fmtC, 'cost', 'main', t('perKg'), MT.cpk, pc(p => p.totals.cpk)),
   ].join('');
   // north star sentence under the group cards
@@ -363,6 +365,7 @@ function renderPerf() {
   $('#kpiMkt').innerHTML = [
     kpi(t('spend'), T0.spend, T0.spendT, fmtUSD, 'pace', MT.spend, pc(p => p.totals.spend)),
     kpi(t('leads'), T0.leads, T0.leadsT, v => fmtN(v), 'volume', MT.leads, pc(p => p.totals.leads)),
+    kpiPlain(t('ovhLbl'), T0.overhead ? fmtUSD(T0.overhead, 0) : '-', T0.overhead ? t('ovhShare')(fmtP(T0.spend ? T0.overhead / T0.spend : null)) : t('ovhNone'), T0.overhead && perfC ? T0.overhead : undefined, pc(p => p.totals.overhead), 'cost'),
     kpiPlain(t('newDonors'), dna ? '-' : fmtN(D0.newN), dna ? '' : t('shareOfDonors')(fmtP(D0.newShare)), dna || !DC ? undefined : D0.newN, DC && DC.newN, 'volume'),
     kpiPlain(t('retDonors'), dna ? '-' : fmtN(D0.retN), dna ? '' : t('shareOfDonors')(fmtP(D0.newShare == null ? null : 1 - D0.newShare)), dna || !DC ? undefined : D0.retN, DC && DC.retN, 'volume'),
     gl('paid'), gl('organic'), gl('wa'),

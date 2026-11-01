@@ -166,7 +166,23 @@
     }
     if (estimated) notes.push('Some kg-by-source splits were estimated from lead share (no Odoo attribution for that city).');
 
+    // Actual marketing overhead (entered in the MTD tab at month end): prorated per day, added to total spend and
+    // shared across cities and groups by their direct spend, and kept visible as its own figure.
+    let overheadA = 0;
+    const directC = Object.values(cities).reduce((a, x) => a + x.spend, 0);
+    const directG = GROUPS.reduce((a, g) => a + groups[g].spend, 0);
+    for (const d of eachDay(from, to)) {
+      const mk = d.slice(0, 7), m = ds.months[mk];
+      if (!m || !m.overheadActual) continue;
+      const oh = m.overheadActual / ((m.forecast && m.forecast.daysInMonth) || dim(mk));
+      overheadA += oh; day(d).spend += oh;
+    }
+    if (overheadA && directC > 0) {
+      for (const c of Object.values(cities)) { const sh = overheadA * c.spend / directC; c.overhead = sh; c.spend += sh; }
+      if (directG > 0) for (const g of GROUPS) groups[g].spend += overheadA * groups[g].spend / directG;
+    }
     for (const c of Object.values(cities)) for (const k of Object.keys(blank())) total[k] += c[k];
+    total.overhead = overheadA;
     const cityList = Object.values(cities)
       .filter(c => c.spend || c.spendT || c.leads || c.weight)
       .map(c => { const o = finish({ ...c }); o.label = LABELS[c.city] || { en: c.city, ar: c.city }; delete o.g; return o; })
@@ -233,7 +249,7 @@
     return {
       range: { from, to, lastReported, targetEnd, firstAvailable: first },
       sources: { sheets: { ...ds.sources.sheets, tabs }, odoo: ds.sources.odoo, ads: ds.sources.ads },
-      totals: total, monthTargets: mt, groups, cities: cityList, platforms, branding, brandingMoved, donors, overheadT,
+      totals: total, monthTargets: mt, groups, cities: cityList, platforms, branding, brandingMoved, donors, overheadT, overheadA,
       reconciliation: { sheetPaidSpend: groups.paid.spend, adPlatformsSpend: adsTotal },
       series: seriesList, notes, generatedAt: ds.generatedAt,
     };
