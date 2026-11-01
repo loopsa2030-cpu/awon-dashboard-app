@@ -1,6 +1,6 @@
 // Month loader: finds each month's Daily + Forecast tab (auto-detects new monthly tabs),
 // parses them and returns normalised rows.
-const { findTab, parseDaily, parseForecast } = require('./parse');
+const { findTab, parseDaily, parseForecast, parseMtdOverhead } = require('./parse');
 const google = require('./google');
 
 const FIRST_MONTH = process.env.FIRST_MONTH || '2026-02';   // "All time" floor
@@ -23,9 +23,12 @@ async function loadMonths(from, to) {
     const k = key(spec);
     const dTab = findTab(mtd.sheetNames, { ...spec, kind: 'daily' });
     const fTab = findTab(fc.sheetNames, { ...spec, kind: 'forecast' });
-    const entry = { dailyTab: dTab, forecastTab: fTab, rows: [], forecast: null };
+    const mTab = findTab(mtd.sheetNames, { ...spec, kind: 'mtd' });
+    const entry = { dailyTab: dTab, forecastTab: fTab, rows: [], forecast: null, overheadActual: null };
     try { if (dTab) entry.rows = parseDaily(mtd.read([dTab])[dTab]); else notes.push(`No Daily tab found for ${k}`); }
     catch (e) { notes.push(`${dTab}: ${e.message}`); }
+    try { if (mTab) entry.overheadActual = parseMtdOverhead(mtd.read([mTab])[mTab]); }
+    catch (e) { notes.push(`${mTab}: ${e.message}`); }
     try { if (fTab) entry.forecast = parseForecast(fc.read([fTab])[fTab]); else notes.push(`No Forecast tab found for ${k}`); }
     catch (e) { notes.push(`${fTab}: ${e.message}`); }
     out[k] = entry;

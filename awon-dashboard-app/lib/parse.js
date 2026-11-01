@@ -202,4 +202,33 @@ function parseForecast(ws) {
   return { cities, daysInMonth, overhead };
 }
 
-module.exports = { findTab, parseDaily, parseForecast, MONTHS, num, toISO };
+
+// Month-end overhead entered in the "(MTD)" tab: a short column of amounts (below the city table) whose last
+// cell is their sum. Returns that total, or null while the month has not been closed yet.
+function parseMtdOverhead(ws) {
+  const g = grid(ws);
+  let start = g.findIndex(r => /^total/.test(low(r[0] || '')));
+  start = start < 0 ? 0 : start + 1;
+  const width = Math.max(0, ...g.map(r => r.length));
+  for (let c = 1; c < width; c++) {
+    let run = [];
+    const flush = () => {
+      if (run.length >= 3) {
+        const tot = run[run.length - 1], sum = run.slice(0, -1).reduce((a, b) => a + b, 0);
+        if (tot > 0 && Math.abs(tot - sum) <= 1) return tot;
+      }
+      run = [];
+      return null;
+    };
+    for (let r = start; r < g.length + 1; r++) {
+      const v = r < g.length ? num(g[r][c]) : null;
+      if (v !== null && v > 0) { run.push(v); continue; }
+      if (r < g.length && (g[r][c] === null || g[r][c] === '') && run.length && run.length < 2) { continue; }
+      const t = flush();
+      if (t !== null) return t;
+    }
+  }
+  return null;
+}
+
+module.exports = { findTab, parseDaily, parseForecast, parseMtdOverhead, MONTHS, num, toISO };

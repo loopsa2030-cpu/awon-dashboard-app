@@ -21,7 +21,7 @@ async function sheetsPart(to) {
   const months = {};
   for (const [k, m] of Object.entries(s.months)) {
     months[k] = {
-      dailyTab: m.dailyTab, forecastTab: m.forecastTab, forecast: m.forecast,
+      dailyTab: m.dailyTab, forecastTab: m.forecastTab, forecast: m.forecast, overheadActual: m.overheadActual,
       rows: (m.rows || []).filter(r => r.reported).map(r => [r.date, r.city,
         r.paid ? r.paid.leads : 0, r2(r.paid ? r.paid.spend : 0), r.organic ? r.organic.leads : 0, r2(r.organic ? r.organic.spend : 0),
         r.wa ? r.wa.leads : 0, r2(r.wa ? r.wa.spend : 0), r.pickups, r2(r.weight)]),
