@@ -24,6 +24,11 @@ function findTab(sheetNames, spec) {
   const hits = sheetNames.filter(s => tabMatches(s, spec));
   // prefer names that start with the month/Awon (avoids e.g. "Mar Awon Feb 2026 Daily")
   hits.sort((a, b) => a.trim().length - b.trim().length);
+  // Several versions of one month's forecast ("... Forecast V1", "V2", "V3"): the highest version is the live one.
+  if (spec.kind === 'forecast' && hits.length > 1) {
+    const ver = h => { const m = /\bv(?:ersion)?\s*(\d+)\s*$/i.exec(h.trim()); return m ? Number(m[1]) : 0; };
+    hits.sort((a, b) => ver(b) - ver(a) || a.trim().length - b.trim().length);
+  }
   if (spec.kind === 'daily') {
     const exact = hits.filter(h => !/^(mar|ram)\s/i.test(h.trim()));
     if (exact.length) return exact[0];
