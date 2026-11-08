@@ -17,7 +17,7 @@ const T = {
     mxTitle: 'Spend quality by platform', mxSub: 'For the selected dates. Green is better than the reference, red is worse, grey has no reference.',
     mainKpi: 'Kilograms per $1,000', mainNote: 'The main number: we are a weight business, not a leads business.', ref: 'Reference',
     openTitle: 'Open orders', openOf: n => `Valid leads in the period: ${n}. Open = leads not yet received.`, withOv: 'With overheads', totalOv: 'Total with overheads', bkPaid: 'Paid ads', bkBrand: 'Branding', ofBudget: 'of', g_tools: 'Tools and subscriptions', g_ugc: 'UGC / IGC', g_production: 'Production', g_services: 'Outsourced services',
-    ohNote: 'Tools, UGC/IGC, production and outsourced services are entered per month in Settings and divided by the days of that month. The Total row is platforms and WhatsApp only; the row below adds the overheads.', openNote: 'Weight arrives days after the lead, so the last days of the month read lower than the final number.',
+    ohNote: 'Tools, UGC/IGC, production and outsourced services are entered per month in Settings and divided by the days of that month. Overheads accrue per completed day (monthly amount / days in the month, up to yesterday) and are included in the Total.', openNote: 'Weight arrives days after the lead, so the last days of the month read lower than the final number.',
     cols: { platform: 'Platform', kgk: 'Kg per $1,000', ldk: 'Leads per $1,000', cpl: 'CPL', cpk: 'Cost per kg', pr: 'Pickup rate', kgo: 'Kg per order', nr: 'Spend with no result', spend: 'Spend', leads: 'Valid leads', kg: 'Kg' },
     dir: { up: 'higher is better', down: 'lower is better' },
     meta: 'Meta', tiktok: 'TikTok', snapchat: 'Snapchat', google: 'Google', wa: 'WhatsApp', total: 'Total', other: 'Not linked to a platform',
@@ -55,7 +55,7 @@ const T = {
     mxTitle: 'جودة الصرف لكل منصة', mxSub: 'للفترة المحددة. الأخضر أفضل من المرجع، والأحمر أسوأ، والرمادي بلا مرجع.',
     mainKpi: 'كيلو لكل 1,000 دولار', mainNote: 'الرقم الرئيسي: نحن في بزنس أوزان، مو بزنس ليدز.', ref: 'المرجع',
     openTitle: 'الطلبات المفتوحة', openOf: n => `الليدز الصالحة في الفترة: ${n}. المفتوح = ليدز لم تُستلم بعد.`, withOv: 'مع التكاليف الأخرى', totalOv: 'الإجمالي مع التكاليف الأخرى', bkPaid: 'الإعلانات المدفوعة', bkBrand: 'البراندنج', ofBudget: 'من', g_tools: 'الأدوات والاشتراكات', g_ugc: 'UGC / IGC', g_production: 'الإنتاج', g_services: 'الخدمات الخارجية',
-    ohNote: 'الأدوات وUGC/IGC والإنتاج والخدمات الخارجية تُدخل شهرياً في الإعدادات وتُقسم على أيام ذلك الشهر. صف الإجمالي للمنصات والواتساب فقط، والصف الذي تحته يضيف هذه التكاليف.', openNote: 'الكيلو يتأخر عن الليد لأن الاستلام يحصل بعد أيام، لذلك تظهر آخر أيام الشهر أقل من حقيقتها.',
+    ohNote: 'الأدوات وUGC/IGC والإنتاج والخدمات الخارجية تُدخل شهرياً في الإعدادات وتُقسم على أيام ذلك الشهر. وتُحتسب لكل يوم مكتمل (حتى أمس) وتدخل ضمن الإجمالي.', openNote: 'الكيلو يتأخر عن الليد لأن الاستلام يحصل بعد أيام، لذلك تظهر آخر أيام الشهر أقل من حقيقتها.',
     cols: { platform: 'المنصة', kgk: 'كيلو لكل 1,000$', ldk: 'ليدز لكل 1,000$', cpl: 'تكلفة الليد', cpk: 'تكلفة الكيلو', pr: 'نسبة الاستلام', kgo: 'كيلو لكل طلب', nr: 'صرف بلا نتيجة', spend: 'الصرف', leads: 'الليدز الصالحة', kg: 'الكيلو' },
     dir: { up: 'الأعلى أفضل', down: 'الأقل أفضل' },
     meta: 'Meta', tiktok: 'TikTok', snapchat: 'Snapchat', google: 'Google', wa: 'واتساب', total: 'الإجمالي', other: 'غير مربوط بمنصة',
@@ -147,7 +147,7 @@ function overhead(from, to) {
   const out = { tools: 0, ugc: 0, production: 0, services: 0 };
   for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = addD(m + '-01', 32).slice(0, 7)) {
     const s = settings.months[m]; if (!s) continue;
-    const ms = m + '-01', me = m + '-' + String(dim(m)).padStart(2, '0'), a = from > ms ? from : ms, b = to < me ? to : me;
+    const ms = m + '-01', me = m + '-' + String(dim(m)).padStart(2, '0'), a = from > ms ? from : ms, y = addD(todayKSA(), -1), b = [to, me, y].sort()[0];
     if (b < a) continue; const share = (Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1) / dim(m);
     for (const g of OH) out[g] += (Number(monthGroup(s, g).spend) || 0) * share;
   }
@@ -167,7 +167,7 @@ function groupData(ds, from, to) {
   const tot = init(); for (const g of Object.values(grp)) for (const k of Object.keys(tot)) tot[k] += g[k];
   grp.total = tot;
   const oh = overhead(from, to);
-  grp.totalOv = { ...tot, spend: tot.spend + oh.total };
+  tot.spend += oh.total;   // Total = platforms + WhatsApp + overheads
   return { grp, noRes, S, oh };
 }
 const metricsOf = g => ({
@@ -213,16 +213,15 @@ function matrix(ds, from, to) {
   };
   const tg = grp.total, mt = metricsOf(tg), mref = R.kgPer1000;
   const open = Math.max(0, tg.leads - tg.coh);
-  const mo = metricsOf(grp.totalOv);
   const main = `<div class="sp-tiles"><div class="panel sp-main ${cls(mt.kgPer1000, mref, 'up')}"><div class="k">${esc(t('mainKpi'))}</div><div class="v">${num(fN(mt.kgPer1000, 0))}</div>
-    <div class="t"><span>${esc(t('ref'))} ${num(fN(mref, 0))}</span><span>${esc(t('withOv'))} ${num(fN(mo.kgPer1000, 0))}</span></div><p class="muted sm">${esc(t('mainNote'))}</p></div>
+    <div class="t"><span>${esc(t('ref'))} ${num(fN(mref, 0))}</span></div><p class="muted sm">${esc(t('mainNote'))}</p></div>
     <div class="panel sp-open"><div class="k">${esc(t('openTitle'))}</div><div class="v">${num(fN(open))}</div><div class="t"><span>${esc(t('openOf')(fN(tg.leads)))}</span></div><p class="muted sm">${esc(t('openNote'))}</p></div></div>`;
   const head = `<tr><th>${esc(t('cols').platform)}</th>${cols.map(([, k, dir]) => `<th><span>${esc(t('cols')[k])}</span><small>${esc(t('dir')[dir])}</small></th>`).join('')}</tr>`;
   const nr = noRes.length ? `<details class="panel nr"><summary><b>${esc(t('nrTitle'))}</b> <span class="muted">${esc(t('nrSub')(settings.noResultMin ?? 50))} · ${num(fUSD(noRes.reduce((a, c) => a + c.spend, 0)))}</span></summary>
       <div class="tbl-wrap"><table class="lst"><tr><th>${esc(t('nrCamp'))}</th><th>${esc(t('nrPlat'))}</th><th>${esc(t('nrSpend'))}</th><th>${esc(t('nrDays'))}</th></tr>${noRes.map(c => `<tr><td dir="auto">${esc(c.name)}</td><td>${esc(t(c.plat))}</td><td>${num(fUSD(c.spend, 0))}</td><td>${num(c.days.size)}</td></tr>`).join('')}</table></div>
       <p class="muted sm pad">${esc(t('nrProxy'))}</p></details>`
     : `<div class="panel nr"><p class="muted pad">${esc(t('nrNone'))}</p></div>`;
-  return `${main}<div class="panel"><div class="tbl-wrap"><table class="mx">${head}${[...PLATS.map(row), row('total'), row('totalOv'), row('other')].join('')}</table></div></div>${nr}
+  return `${main}<div class="panel"><div class="tbl-wrap"><table class="mx">${head}${[...PLATS.map(row), row('total'), row('other')].join('')}</table></div></div>${nr}
     <ul class="notes"><li>${esc(t('otherHint'))}</li><li>${esc(t('wdNote'))}</li><li>${esc(t('waNote'))}</li><li>${esc(t('ohNote'))}</li></ul>`;
 }
 
