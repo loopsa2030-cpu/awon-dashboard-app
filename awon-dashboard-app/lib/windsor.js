@@ -35,18 +35,20 @@ async function query(connector, account, fields, from, to) {
 async function platform(name, from, to) {
   const a = ACC[name];
   const raw = await query(a.connector, a.account, ['date', 'campaign', 'campaign_id', a.objective, 'spend', a.leads, a.clicks], from, to);
-  const ids = {}, agg = new Map();
+  const ids = {}, agg = new Map(), byName = new Map();
   for (const r of raw) {
     const date = String(r.date).slice(0, 10), cname = String(r.campaign || '').trim();
     if (r.campaign_id) ids[String(r.campaign_id)] = cname;
     const sp = Number(r.spend) || 0, ld = Number(r[a.leads]) || 0, ck = Number(r[a.clicks]) || 0;
     if (!sp && !ld && !ck) continue;
     const city = cityFromText(cname) || '', lg = ads._isLeadgen(ads.PLATFORMS[name], r[a.objective], cname) ? 1 : 0;
+    const nk = date + '|' + cname, y = byName.get(nk) || [date, cname, 0, 0, lg];
+    y[2] += sp * FX; y[3] += ld; byName.set(nk, y);
     const k = date + '|' + city + '|' + lg;
     const x = agg.get(k) || [date, city, lg, 0, 0, 0];
     x[3] += sp * FX; x[4] += ld; x[5] += ck; agg.set(k, x);
   }
-  return { rows: [...agg.values()].map(x => [x[0], x[1], x[2], r2(x[3]), Math.round(x[4] * 100) / 100, x[5]]), ids };
+  return { rows: [...agg.values()].map(x => [x[0], x[1], x[2], r2(x[3]), Math.round(x[4] * 100) / 100, x[5]]), ids, cdet: [...byName.values()].map(y => [y[0], y[1], r2(y[2]), Math.round(y[3] * 100) / 100, y[4]]) };
 }
 
 async function gaRaw(from, to) {
@@ -62,10 +64,10 @@ async function load(from, to) {
     try { return [k, await platform(k, from, to)]; }
     catch (e) { errors.push(`${k}: ${e.message}`); return [k, { rows: [], ids: {} }]; }
   }));
-  const camps = {}, names = {};
-  for (const [k, r] of entries) { camps[k] = r.rows; Object.assign(names, r.ids); }
+  const camps = {}, names = {}, cdet = {};
+  for (const [k, r] of entries) { camps[k] = r.rows; cdet[k] = r.cdet || []; Object.assign(names, r.ids); }
   const ga = ads.gaAggregate(await gaP, names);
-  return { source: 'windsor', camps, platforms: {}, ga, errors };
+  return { source: 'windsor', camps, cdet, platforms: {}, ga, errors };
 }
 
 module.exports = { load, configured };

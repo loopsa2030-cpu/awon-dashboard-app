@@ -28,6 +28,7 @@
     <button class="tab" role="tab" id="tab-perf" aria-selected="true" aria-controls="view-perf" data-i18n="tabPerf">Performance</button>
     <button class="tab" role="tab" id="tab-mkt" aria-selected="false" aria-controls="view-mkt" data-i18n="tabMkt">Marketing</button>
     <button class="tab" role="tab" id="tab-map" aria-selected="false" aria-controls="view-map" data-i18n="tabMap">Donor map</button>
+    <button class="tab" role="tab" id="tab-set" aria-selected="false" aria-controls="view-set" data-i18n="tabSet">Settings</button>
   </nav>
 </header>
 
@@ -54,13 +55,9 @@
     <p class="star-t" id="cpkTxt"></p>
 
     <section>
-      <div class="sec-h"><h2 data-i18n="nsTitle">North stars</h2><p data-i18n="nsSub">The one number each team owns, and the three numbers that move it</p></div>
-      <div class="ns-grid" id="northStars"></div>
-    </section>
-
-    <section>
       <div class="sec-h"><h2 data-i18n="marketing">Marketing</h2><p data-i18n="vsTarget">Actual against the forecast, prorated to the last reported day</p></div>
       <div class="kpis" id="kpiMkt"></div>
+      <div id="kpiSpend"></div>
     </section>
     <section>
       <div class="sec-h"><h2 data-i18n="logistics">Logistics</h2><p data-i18n="logiNote">Fridays are non-operating days in the target</p></div>
@@ -82,6 +79,8 @@
     </section>
 
 
+    <div id="kpiPartners"></div>
+
     <section>
       <div class="sec-h"><h2 data-i18n="cities">Cities</h2></div>
       <div class="panel"><div class="tbl-wrap"><table id="cityTbl"></table></div></div>
@@ -96,6 +95,7 @@
       </div>
       <div class="panel" style="margin-top:18px"><h3 class="ch" style="padding:16px 18px 0" data-i18n="cCohort"></h3><div class="tbl-wrap"><table id="cohortTbl" class="cohort"></table></div></div>
     </section>
+    <div id="kpiInit"></div>
     <div id="perfErr"></div>
     <ul class="notes" id="notes"></ul>
   </div>
@@ -103,6 +103,11 @@
   <div class="view" id="view-mkt" role="tabpanel" aria-labelledby="tab-mkt" hidden>
     <div id="mktErr"></div>
     <div id="mkt"></div>
+    <div id="kpiTeam"></div>
+  </div>
+
+  <div class="view" id="view-set" role="tabpanel" aria-labelledby="tab-set" hidden>
+    <div id="kpiSet"></div>
   </div>
 
   <div class="view" id="view-map" role="tabpanel" aria-labelledby="tab-map" hidden>
@@ -136,6 +141,7 @@
 <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="calc.js"></script>
 <script src="marketing.js"></script>
+<script src="kpi.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
