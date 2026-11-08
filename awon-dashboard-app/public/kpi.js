@@ -181,8 +181,13 @@ function cls(v, ref, dir) { if (v == null || ref == null) return 'na'; return (d
 function budgetCard(ds, to) {
   const m = to.slice(0, 7), s = settings.months[m] || {}, ms = m + '-01';
   const adAll = Object.values(adSpend(ds, ms, to)), paid = adAll.filter(c => c.lg).reduce((a, c) => a + c.spend, 0), brand = adAll.filter(c => !c.lg).reduce((a, c) => a + c.spend, 0), ads = paid + brand, wa = waSpend(ds, ms, to), oh = overhead(ms, to);
-  const spent = ads + wa + oh.total, bsum = ['paid', 'wa', 'branding'].reduce((a, g) => a + (Number(s[g] && s[g].budget) || 0), 0) + OH.reduce((a, g) => a + (Number(monthGroup(s, g).budget) || 0), 0), budget = s.budget || bsum || null;
-  const brk = [[t('bkPaid'), paid, s.paid && s.paid.budget], [t('bkBrand'), brand, s.branding && s.branding.budget], [t('wa'), wa, s.wa && s.wa.budget], ...OH.map(g => [t('g_' + g), oh[g], monthGroup(s, g).budget])];
+  // Paid, branding and WhatsApp budgets: the Settings value when entered, otherwise the month's forecast tab
+  const fcCities = (ds.months && ds.months[m] && ds.months[m].forecast && ds.months[m].forecast.cities) || [];
+  const fcB = k => fcCities.reduce((a, c) => a + ((c[k] && c[k].budget) || 0), 0) || null;
+  const gb = (g, k) => Number(s[g] && s[g].budget) || fcB(k);
+  const bPaid = gb('paid', 'paid'), bBrand = gb('branding', 'organic'), bWa = gb('wa', 'wa');
+  const spent = ads + wa + oh.total, bsum = (bPaid || 0) + (bBrand || 0) + (bWa || 0) + OH.reduce((a, g) => a + (Number(monthGroup(s, g).budget) || 0), 0), budget = s.budget || bsum || null;
+  const brk = [[t('bkPaid'), paid, bPaid], [t('bkBrand'), brand, bBrand], [t('wa'), wa, bWa], ...OH.map(g => [t('g_' + g), oh[g], monthGroup(s, g).budget])];
   const rows = `<div class="sp-brk">${brk.map(([l, v, bd]) => `<div><span>${esc(l)}</span><b>${num(fUSD(v))}</b>${bd ? `<small>${esc(t('ofBudget'))} ${num(fUSD(bd))}</small>` : '<small></small>'}</div>`).join('')}</div>`;
   if (!budget) return `<div class="panel sp-card"><h3 class="ch">${esc(t('budgetTitle'))}</h3><p class="muted">${esc(t('noBudget'))} <a href="#set" data-goset>${esc(t('setLink'))}</a></p><div class="sp-big">${num(fUSD(spent))}<small>${esc(t('spent'))}</small></div>${rows}</div>`;
   const elapsed = +to.slice(8), should = budget * elapsed / dim(m), pace = div(spent, should), pct = Math.min(100, spent / budget * 100);

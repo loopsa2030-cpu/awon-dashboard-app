@@ -60,10 +60,11 @@
     const targetEnd = lastReported && lastReported < to ? lastReported : to;
     if (unfilled.size) { const u = [...unfilled].sort(); notes.push(`Paid spend and leads are not filled in the Daily tab yet for ${u.length > 3 ? u[0] + ' to ' + u[u.length - 1] : u.join(', ')}; those days are left out so spend, leads and kg cover the same days.`); }
 
-    const oKg = {}, oWon = {}, oLog = {};
+    const oKg = {}, oWon = {}, oLog = {}, oOpen = {};
     const plat = Object.fromEntries(PLATS.map(p => [p, { crmLeads: 0, pickups: 0, weight: 0 }]));
     for (const [date, city, group, platform, won, n, kg] of ds.odoo.rows) {
       if (date < from || date > to) continue;
+      const oc = oOpen[city] || (oOpen[city] = [0, 0]); oc[0] += n; if (won) oc[1] += n;   // leads created in the period, and how many reached Won
       if (won) {
         (oKg[city] = oKg[city] || { paid: 0, organic: 0, wa: 0 })[group] += kg;
         (oWon[city] = oWon[city] || { paid: 0, organic: 0, wa: 0 })[group] += n;
@@ -191,9 +192,10 @@
     }
     for (const c of Object.values(cities)) for (const k of Object.keys(blank())) total[k] += c[k];
     total.overhead = overheadA;
+    total.open = Object.values(oOpen).reduce((x, v) => x + Math.max(0, v[0] - v[1]), 0);
     const cityList = Object.values(cities)
       .filter(c => c.spend || c.spendT || c.leads || c.weight)
-      .map(c => { const o = finish({ ...c }); o.label = LABELS[c.city] || { en: c.city, ar: c.city }; delete o.g; return o; })
+      .map(c => { const o = finish({ ...c }); o.label = LABELS[c.city] || { en: c.city, ar: c.city }; o.open = oOpen[c.city] ? Math.max(0, oOpen[c.city][0] - oOpen[c.city][1]) : null; delete o.g; return o; })
       .sort((a, b) => b.spend - a.spend);
 
     let adsTotal = 0;

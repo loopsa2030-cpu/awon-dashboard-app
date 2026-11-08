@@ -26,7 +26,7 @@ const T = {
     cities: 'Cities', trend: 'Daily trend', orders: 'Orders', pickups: 'Pickups', kg: 'Weight (kg)',
     allCities: 'All cities', otherCities: 'Other cities', low: 'Low', high: 'High', topLoc: 'Top districts',
     spend: 'Spend', leads: 'Leads', cpl: 'Cost per lead', cac: 'Cost per pickup', weight: 'Weight collected',
-    pickupRate: 'Pickup rate', kgPerPickup: 'kg per pickup', cpk: 'Cost per kg',
+    pickupRate: 'Pickup rate', kgPerPickup: 'kg per pickup', openOrders: 'Open orders', cpk: 'Cost per kg',
     target: 'target', of: 'of', ahead: 'better than target', behind: 'worse than target', onTrack: 'on target',
     paid: 'Paid ads', organic: 'Organic & branding', wa: 'WhatsApp & CRM',
     cpkLine: (a, t, p) => `Target to date is <b>${t}</b>. That is ${p}.`,
@@ -86,7 +86,7 @@ const T = {
     cities: 'المدن', trend: 'الاتجاه اليومي', orders: 'الطلبات', pickups: 'الاستلامات', kg: 'الوزن (كغ)',
     allCities: 'كل المدن', otherCities: 'مدن أخرى', low: 'منخفض', high: 'مرتفع', topLoc: 'أعلى الأحياء',
     spend: 'الإنفاق', leads: 'العملاء المحتملون', cpl: 'تكلفة العميل', cac: 'تكلفة الاستلام', weight: 'الوزن المجمّع',
-    pickupRate: 'نسبة الاستلام', kgPerPickup: 'كغ لكل استلام', cpk: 'تكلفة الكيلو',
+    pickupRate: 'نسبة الاستلام', kgPerPickup: 'كغ لكل استلام', openOrders: 'الطلبات المفتوحة', cpk: 'تكلفة الكيلو',
     target: 'المستهدف', of: 'من', ahead: 'أفضل من المستهدف', behind: 'أسوأ من المستهدف', onTrack: 'ضمن المستهدف',
     paid: 'الإعلانات المدفوعة', organic: 'العضوي والعلامة', wa: 'واتساب وإعادة التفعيل',
     cpkLine: (a, t, p) => `المستهدف حتى الآن <b>${t}</b>، أي ${p}.`,
@@ -403,7 +403,7 @@ function renderPerf() {
   // kg achievement vs the prorated kg target, per city
   const ach = (a, tg) => { if (!tg) return '<td></td>'; const r = a / tg, st = status(a, tg, 'volume');
     return `<td class="ach"><div class="achrow"><span class="minibar"><i class="${st}" style="width:${Math.min(100, r * 100)}%"></i></span><b class="num ${st}">${fmtN(r * 100, 0)}%</b></div></td>`; };
-  $('#cityTbl').innerHTML = `<thead><tr><th>${t('city')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('pickups')}</th><th>${t('pickupRate')}</th><th>kg</th><th>${t('kgAch')}</th><th>${t('kgPerPickup')}</th><th>${t('cpk')}</th></tr></thead><tbody>` +
+  $('#cityTbl').innerHTML = `<thead><tr><th>${t('city')}</th><th>${t('spend')}</th><th>${t('leads')}</th><th>${t('pickups')}</th><th>${t('pickupRate')}</th><th>kg</th><th>${t('kgAch')}</th><th>${t('kgPerPickup')}</th><th>${t('openOrders')}</th><th>${t('cpk')}</th></tr></thead><tbody>` +
     perf.cities.map(c => { const q = perfC && perfC.cities.find(x => x.city === c.city) || {};
       return `<tr><td>${esc(c.label[lang])}</td>
       <td>${num(fmtUSD(c.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(c.spendT))}</span>${dchg(c.spend, q.spend, 'neutral', 20)}</td>
@@ -412,6 +412,7 @@ function renderPerf() {
       <td class="cpk-cell ${status(c.pickupRate, c.pickupRateT, 'volume')}">${num(fmtP(c.pickupRate))}<span class="sub">${num(fmtP(c.pickupRateT))}</span>${dchg(c.pickupRate, q.pickupRate, 'volume')}</td>
       <td>${num(fmtN(c.weight))}<span class="sub">${num(fmtN(c.weightT))}</span>${dchg(c.weight, q.weight, 'volume', 50)}</td>${ach(c.weight, c.weightT)}
       <td>${num(fmtN(c.kgPerPickup, 1))}<span class="sub">${num(fmtN(c.kgPerPickupT, 1))}</span></td>
+      <td>${c.open == null ? '' : num(fmtN(c.open))}</td>
       <td class="cpk-cell ${status(c.cpk, c.cpkT, 'cost')}">${num(fmtC(c.cpk))}<span class="sub">${num(fmtC(c.cpkT))}</span>${dchg(c.cpk, q.weight >= 50 ? q.cpk : null, 'cost')}</td></tr>`; }).join('') + '</tbody>' +
     `<tfoot><tr><td>${esc(t18('total'))}</td>
       <td>${num(fmtUSD(T0.spend))}<span class="sub">${esc(t('target'))} ${num(fmtUSD(T0.spendT))}</span>${dchg(T0.spend, pc(p => p.totals.spend), 'neutral')}</td>
@@ -420,6 +421,7 @@ function renderPerf() {
       <td class="cpk-cell ${status(T0.pickupRate, T0.pickupRateT, 'volume')}">${num(fmtP(T0.pickupRate))}<span class="sub">${num(fmtP(T0.pickupRateT))}</span>${dchg(T0.pickupRate, pc(p => p.totals.pickupRate), 'volume')}</td>
       <td>${num(fmtN(T0.weight))}<span class="sub">${num(fmtN(T0.weightT))}</span>${dchg(T0.weight, pc(p => p.totals.weight), 'volume')}</td>${ach(T0.weight, T0.weightT)}
       <td>${num(fmtN(T0.kgPerPickup, 1))}<span class="sub">${num(fmtN(T0.kgPerPickupT, 1))}</span></td>
+      <td>${T0.open == null ? '' : num(fmtN(T0.open))}</td>
       <td class="cpk-cell ${status(T0.cpk, T0.cpkT, 'cost')}">${num(fmtC(T0.cpk))}<span class="sub">${num(fmtC(T0.cpkT))}</span>${dchg(T0.cpk, pc(p => p.totals.cpk), 'cost')}</td></tr></tfoot>`;
 
   // chart
