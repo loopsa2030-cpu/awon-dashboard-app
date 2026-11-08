@@ -30,7 +30,7 @@ async function loadMonths(from, to) {
     // Only the layout used since Oct 2026 carries the month-end overhead column; older tabs hold other numbers there.
     try { if (mTab && k >= '2026-10') entry.overheadActual = parseMtdOverhead(mtd.read([mTab])[mTab]); }
     catch (e) { notes.push(`${mTab}: ${e.message}`); }
-    try { if (fTab) entry.forecast = parseForecast(fc.read([fTab])[fTab]); else notes.push(`No Forecast tab found for ${k}`); }
+    try { if (fTab) { entry.forecast = parseForecast(fc.read([fTab])[fTab]); if (entry.forecast.excluded && entry.forecast.excluded.length) notes.push(`${fTab}: ${entry.forecast.excluded.join(', ')} left out of the target because the tab's Total row does not count it.`); } else notes.push(`No Forecast tab found for ${k}`); }
     catch (e) { notes.push(`${fTab}: ${e.message}`); }
     out[k] = entry;
   }

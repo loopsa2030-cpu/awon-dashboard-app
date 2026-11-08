@@ -153,11 +153,12 @@ function parseForecast(ws) {
     row.forEach((c, i) => { if (/^days in month/.test(low(c))) daysInMonth = num(row[i + 1]); });
   }
   const cities = [];
+  let totalRow = null;
   for (let r = hdr + 1; r < g.length; r++) {
     const row = g[r] || [];
     const name = row[C.city];
     const first = low(row[0]);
-    if (first.startsWith('total') || low(name).startsWith('/ blended')) break;
+    if (first.startsWith('total') || low(name).startsWith('/ blended')) { if (first.startsWith('total')) totalRow = row; break; }
     if (!name || typeof name !== 'string') { if (cities.length) break; else continue; }
     const v = k => (C[k] >= 0 ? num(row[C[k]]) ?? 0 : 0);
     cities.push({
@@ -168,6 +169,17 @@ function parseForecast(ws) {
       drivers: v('drivers'), opDays: v('days'),
       pickups: v('pickups'), avgKg: v('avgKg'), weight: v('weight'),
     });
+  }
+  // The sheet's Total row is the agreed target. If it leaves one city out (its sum is short by exactly that city's
+  // weight and pickups), that city is not part of the target either, so drop it instead of inflating the total.
+  const excluded = [];
+  if (totalRow && C.weight >= 0) {
+    const tw = num(totalRow[C.weight]), tp = C.pickups >= 0 ? num(totalRow[C.pickups]) : null;
+    const sw = cities.reduce((a, c) => a + c.weight, 0), sp = cities.reduce((a, c) => a + c.pickups, 0);
+    if (tw !== null && sw - tw > 1) {
+      const i = cities.findIndex(c => Math.abs(c.weight - (sw - tw)) < 1 && (tp === null || Math.abs(c.pickups - (sp - tp)) < 1));
+      if (i >= 0) excluded.push(cities.splice(i, 1)[0].city);
+    }
   }
   // Marketing overhead: newer tabs carry a per-city table, older ones only a single total.
   let overhead = 0;
@@ -204,7 +216,7 @@ function parseForecast(ws) {
       c.overhead = overhead * share;
     }
   });
-  return { cities, daysInMonth, overhead };
+  return { cities, daysInMonth, overhead, excluded };
 }
 
 
