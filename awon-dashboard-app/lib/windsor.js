@@ -51,6 +51,27 @@ async function platform(name, from, to) {
   return { rows: [...agg.values()].map(x => [x[0], x[1], x[2], r2(x[3]), Math.round(x[4] * 100) / 100, x[5]]), ids, cdet: [...byName.values()].map(y => [y[0], y[1], r2(y[2]), Math.round(y[3] * 100) / 100, y[4]]) };
 }
 
+// Ad-level rows for matching partner names at campaign, ad set or ad level: [date, campaign, adSet, ad, spend, leads]
+// (Meta uses Website leads here, the number the partnership benchmark is built on). Rows with no spend and no leads are dropped.
+const AD_LEVEL = {
+  google:   { adset: 'ad_group_name', ad: null, leads: 'conversions' },
+  snapchat: { adset: 'ad_squad_name', ad: 'ad_name', leads: 'conversion_sign_ups' },
+  meta:     { adset: 'adset_name', ad: 'ad_name', leads: 'actions_offsite_conversion_fb_pixel_lead' },
+  tiktok:   { adset: 'ad_group_name', ad: 'ad_name', leads: 'conversions' },
+};
+async function adLevel(name, from, to) {
+  const a = ACC[name], l = AD_LEVEL[name];
+  const raw = await query(a.connector, a.account, ['date', 'campaign', l.adset, ...(l.ad ? [l.ad] : []), 'spend', l.leads], from, to);
+  const out = [];
+  for (const r of raw) {
+    const sp = Number(r.spend) || 0, ld = Number(r[l.leads]) || 0;
+    if (!sp && !ld) continue;
+    const s = v => String(v == null ? '' : v).trim();
+    out.push([String(r.date).slice(0, 10), s(r.campaign), s(r[l.adset]), l.ad ? s(r[l.ad]) : '', r2(sp * FX), Math.round(ld * 100) / 100]);
+  }
+  return out;
+}
+
 async function gaRaw(from, to) {
   const raw = await query('googleanalytics4', GA4_ACCOUNT, ['date', 'session_default_channel_group', 'source', 'campaign', 'sessions'], from, to);
   return raw.map(r => [String(r.date).slice(0, 10), r.session_default_channel_group, r.source, r.campaign, Number(r.sessions) || 0]);
@@ -64,10 +85,15 @@ async function load(from, to) {
     try { return [k, await platform(k, from, to)]; }
     catch (e) { errors.push(`${k}: ${e.message}`); return [k, { rows: [], ids: {} }]; }
   }));
+  const adet = {};
+  await Promise.all(Object.keys(ACC).map(async k => {
+    try { adet[k] = await adLevel(k, from, to); }
+    catch (e) { adet[k] = null; errors.push(`${k} ad level: ${e.message}`); }
+  }));
   const camps = {}, names = {}, cdet = {};
   for (const [k, r] of entries) { camps[k] = r.rows; cdet[k] = r.cdet || []; Object.assign(names, r.ids); }
   const ga = ads.gaAggregate(await gaP, names);
-  return { source: 'windsor', camps, cdet, platforms: {}, ga, errors };
+  return { source: 'windsor', camps, cdet, adet, platforms: {}, ga, errors };
 }
 
 module.exports = { load, configured };

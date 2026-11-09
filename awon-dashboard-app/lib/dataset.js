@@ -178,11 +178,11 @@ async function adsPart(to, previous) {
   let prev = previous && previous.camps && Object.values(previous.camps).some(v => v && v.length) ? previous : null;
   const switching = prev && (prev.source || 'supermetrics') !== pv.name;
   if (prev && !switching && prev.fetchedAt && Date.now() - prev.fetchedAt < ADS_EVERY)
-    return { platforms: prev.platforms, camps: prev.camps, cdet: prev.cdet || {}, ga: prev.ga || [], fetchedAt: prev.fetchedAt, source: prev.source, meta: { mode: 'live', errors: prev.errors || [] } };
+    return { platforms: prev.platforms, camps: prev.camps, cdet: prev.cdet || {}, adet: prev.adet || {}, ga: prev.ga || [], fetchedAt: prev.fetchedAt, source: prev.source, meta: { mode: 'live', errors: prev.errors || [] } };
   // First run on a new provider: load the full history from it, compare with what the old provider gave, then use it
   // Campaign-name rows (spend quality section) are new: when the saved copy has none, load from the start of last month once
   const monthBack = (() => { const d = new Date(to + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1, 1); return d.toISOString().slice(0, 10); })();
-  const from = prev && !switching ? (prev.cdet ? addDays(to, -ADS_WINDOW_DAYS) : monthBack) : FIRST_MONTH + '-01';
+  const from = prev && !switching ? (prev.cdet && prev.adet ? addDays(to, -ADS_WINDOW_DAYS) : monthBack) : FIRST_MONTH + '-01';
   const r = await pv.mod.load(from, to);
   if (switching) { compareLog('ads compare ' + pv.name + ' vs ' + (prev.source || 'supermetrics') + ' [new, old]', r, prev); }
   const errors = [...(r.errors || [])];
@@ -194,6 +194,11 @@ async function adsPart(to, previous) {
     if (failed(p) && !fresh.length) camps[p] = old;                       // keep the saved rows if this platform failed
     else camps[p] = [...old.filter(x => x[0] < from), ...fresh];
   }
+  const adet = {};
+  for (const p of Object.keys(ads.PLATFORMS)) {
+    const fresh = r.adet && r.adet[p], old = (prev && prev.adet && prev.adet[p]) || [];
+    adet[p] = (!fresh ? old : [...old.filter(x => x[0] < from), ...fresh]).filter(x => x[0] >= monthBack);
+  }
   const cdet = {};
   for (const p of Object.keys(ads.PLATFORMS)) {
     const old = (prev && prev.cdet && prev.cdet[p]) || [];
@@ -202,7 +207,7 @@ async function adsPart(to, previous) {
   const oldGa = (prev && prev.ga) || [];
   const ga = failed('GA4') && !(r.ga || []).length ? oldGa : [...oldGa.filter(x => x[0] < from), ...(r.ga || [])];
   if (errors.length) console.error('ads: ' + errors.join(' | '));
-  return { platforms: platformsFrom(camps), camps, cdet, ga, fetchedAt: Date.now(), source: pv.name, meta: { mode: 'live', errors, window: from } };
+  return { platforms: platformsFrom(camps), camps, cdet, adet, ga, fetchedAt: Date.now(), source: pv.name, meta: { mode: 'live', errors, window: from } };
 }
 
 // Never replace a complete donor split with one built without the history sheet
@@ -222,12 +227,12 @@ async function build() {
     timed('sheets', sheetsPart(to)),
     timed('wa', withTimeout(wadata.load(), 60000, 'WhatsApp report')).catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     timed('odoo', withTimeout(odooPart(to), 200000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
-    timed('ads', withTimeout(adsPart(to, cached && cached.ads), 240000, 'Ad data')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, ga: cached.ads.ga || [], fetchedAt: cached.ads.fetchedAt, source: cached.ads.source, meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
+    timed('ads', withTimeout(adsPart(to, cached && cached.ads), 240000, 'Ad data')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, cdet: cached.ads.cdet || {}, adet: cached.ads.adet || {}, ga: cached.ads.ga || [], fetchedAt: cached.ads.fetchedAt, source: cached.ads.source, meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
     timed('kpi', withTimeout(kpi.build(kpiFrom, to), 120000, 'KPI data')).catch(e => { notes.push('KPI data: ' + e.message); return cached && cached.data.kpi ? cached.data.kpi : { mode: 'error', error: e.message, sources: [], leads: [], recv: [], cohort: [] }; }),
   ]);
   const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
-    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, cdet: ad.cdet || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
+    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, cdet: ad.cdet || {}, adet: ad.adet || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
     waReport: { rows: wa.rows }, kpi: kp,
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],

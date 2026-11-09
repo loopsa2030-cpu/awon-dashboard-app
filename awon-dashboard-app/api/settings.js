@@ -21,6 +21,7 @@ function clean(b) {
   const num = v => (v === '' || v == null || !isFinite(Number(v)) ? null : Number(v));
   const str = (v, n = 120) => String(v == null ? '' : v).slice(0, n);
   const ids = a => (Array.isArray(a) ? a : []).map(Number).filter(x => Number.isInteger(x) && x > 0).slice(0, 60);
+  const strs = (a, n) => (Array.isArray(a) ? a : []).map(v => str(v, 60).trim()).filter(Boolean).slice(0, n);
   const list = (a, n) => (Array.isArray(a) ? a : []).slice(0, n);
   const months = {};
   const grp = g => ({ budget: num(g && g.budget), spend: num(g && g.spend) });
@@ -35,7 +36,12 @@ function clean(b) {
       leadsPer1000By: { meta: num(refs.leadsPer1000By && refs.leadsPer1000By.meta), tiktok: num(refs.leadsPer1000By && refs.leadsPer1000By.tiktok), snapchat: num(refs.leadsPer1000By && refs.leadsPer1000By.snapchat), google: num(refs.leadsPer1000By && refs.leadsPer1000By.google) } },
     noResultMin: num(b.noResultMin) == null ? 50 : num(b.noResultMin),
     partnerTargets: { active: str(b.partnerTargets && b.partnerTargets.active, 20), leads: num(b.partnerTargets && b.partnerTargets.leads), kg: num(b.partnerTargets && b.partnerTargets.kg) },
-    partners: list(b.partners, 60).map(p => ({ name: str(p.name), sources: ids(p.sources), start: str(p.start, 10), leads: num(p.leads), kg: num(p.kg) })),
+    partners: list(b.partners, 60).map(p => ({ name: str(p.name), sources: ids(p.sources), start: str(p.start, 10), end: str(p.end, 10), leads: num(p.leads), kg: num(p.kg),
+      cities: strs(p.cities, 12), aliases: strs(p.aliases, 20),
+      costs: list(p.costs, 40).map(c => ({ name: str(c && c.name), cost: num(c && c.cost) })),
+      checks: { page: !!(p.checks && p.checks.page), partnerCh: !!(p.checks && p.checks.partnerCh), awonCh: !!(p.checks && p.checks.awonCh) } })),
+    partnerBench: Object.fromEntries(['tiktok', 'snapchat', 'meta', 'google'].map(pl => [pl, Object.fromEntries(Object.entries((b.partnerBench && b.partnerBench[pl]) || {}).filter(([k]) => /^[a-z]{2,12}$/.test(k)).map(([k, v]) => [k, num(v)]))])),
+    partnerCpk: { pick: [1, 2, 3].includes(Number(b.partnerCpk && b.partnerCpk.pick)) ? Number(b.partnerCpk.pick) : 2, s: [0, 1, 2].map(i => num(b.partnerCpk && b.partnerCpk.s && b.partnerCpk.s[i])), band: num(b.partnerCpk && b.partnerCpk.band) },
     initiatives: list(b.initiatives, 60).map(i => ({ name: str(i.name), status: ['planned', 'active', 'paused', 'done'].includes(i.status) ? i.status : 'planned', start: str(i.start, 10), end: str(i.end, 10), sources: ids(i.sources), leads: num(i.leads) })),
     team: list(b.team, 20).map(m => ({ name: str(m.name), metric: str(m.metric, 40), dir: m.dir === 'down' ? 'down' : 'up', start: num(m.start), startDate: str(m.startDate, 10), days: num(m.days), source: str(m.source, 40), manual: Object.fromEntries(Object.entries(m.manual || {}).filter(([d, v]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && num(v) != null).map(([d, v]) => [d, num(v)])) })),
     updatedAt: new Date().toISOString(),

@@ -96,6 +96,9 @@ const AD_PLATS = ['meta', 'tiktok', 'snapchat', 'google'];
 const DEFAULTS = {
   months: {}, refs: { kgPer1000: 5263, leadsPer1000: 137, cpl: 7.29, cpk: 0.19, pickupRate: null, kgPerOrder: null, leadsPer1000By: { meta: 114, tiktok: 148, snapchat: 140, google: null } },
   noResultMin: 50, partnerTargets: { active: '2-3', leads: 2100, kg: null }, partners: [], initiatives: [],
+  partnerBench: { tiktok: { all: 148, jeddah: 168, riyadh: 128, eastern: 148, madina: 136, asir: 146 }, snapchat: { all: 140, jeddah: 151, riyadh: 141, eastern: 137, madina: 127, asir: 142, taif: 120, mecca: 141 },
+    meta: { all: 114, jeddah: 151, riyadh: 111, eastern: 122, madina: 97, asir: 74, taif: 100 }, google: {} },
+  partnerCpk: { pick: 2, s: [0.191, 0.206, 0.223], band: 0.03 },
   team: ['Afnan', 'Raghad', 'Jawad', 'Zanoon', 'Haidy', 'Dalia'].map(n => ({ name: n, metric: '', dir: 'up', start: null, startDate: '', days: null, source: '', manual: {} })),
 };
 
@@ -311,6 +314,225 @@ function teamSection(ds, to) {
     <div class="kpis tm-grid">${cards.map(c => c.html).join('')}</div>`;
 }
 
+// ---------------- partnerships tab ----------------
+// Partnership leads = direct leads (Odoo, partner source) + uplift of partner ads over the benchmark (leads per $1,000).
+// Inputs (partners, targets, benchmarks, CPK scenario, non-paid costs) come from Settings; actuals from Odoo; spend from the ad accounts.
+Object.assign(T.en, {
+  ptTitle: 'Partnership leads', ptSub: 'Direct leads from the partner source + uplift of partner ads over the benchmark',
+  ptOfLeads: 'of', ptLeadsU: 'leads', ptShould: 'Should be at by today', ptLeft: 'Left', ptTargetL: 'Target',
+  ptDirect: 'Direct leads', ptDirectSub: 'From the partner source in Odoo · the base of the target', ptUplift: 'Uplift over benchmark', ptUpliftSub: 'From partner videos in our ads',
+  ptEq: 'Direct leads + uplift = partnership leads', ptKgT: 'Weight received', ptSpendT: 'Partnership spend', ptSpendSub: (a, b) => `Paid ads ${a} + other costs ${b}`,
+  ptCards: 'Partners', ptCardsSub: 'Each partner against its own target, prorated to today',
+  wfGross: 'With partner source', wfDup: 'Duplicate', wfProh: 'Prohibited items', wfOut: 'Out of coverage', wfValid: 'Valid direct',
+  ptAdsN: n => `Uplift from ads (${n} ${n === 1 ? 'ad' : 'ads'})`, ptTotal: 'Partner total', ptOfT: (a, b) => `${a} of ${b} · should be at ${b === '–' ? '–' : ''}`,
+  ptPick: 'Pickups received', ptKg: 'Weight received', ptPaid: 'Paid ads', ptOther: 'Other costs', ptSpend: 'Total spend', ptCpl: 'Cost per lead', ptCpk: 'Cost per kg',
+  ptOnTrack: 'On track', ptBehind: 'Behind', ptAhead: 'Ahead', ptNoTarget: 'No target set', ptNotStarted: 'Not started',
+  ptNone: 'No partners yet. Add each partner in Settings: name, Odoo source, targets, ad names and other costs.', ptGo: 'Open Settings',
+  ptAds: 'Partner ads', ptAdsSub: 'Ads whose campaign, ad set or ad name carries the partner name · each ad stands alone · never negative',
+  ptAdCols: ['Partner', 'Ad', 'Platform · city', 'Spend', 'Bench. /$1k', 'Expected', 'Actual', 'Counted', 'Status'],
+  ptAbove: 'Above expected · counts the increase', ptBelow: 'Below expected · stop spend, counts its leads', ptNoBench: 'No benchmark for this platform',
+  ptFuzzy: 'Name close to the partner: check spelling or add an alias', ptMatchedOn: { ad: 'ad', adset: 'ad set', campaign: 'campaign' },
+  ptNoAds: 'No ad names match any partner in this period.',
+  ptBench: 'Benchmarks', ptBenchSub: 'Leads per $1,000 from our usual lead campaigns, October 2026 · edit in Settings',
+  ptAll: 'All cities', ptBenchNote: 'An empty city uses the platform\'s overall number.',
+  ptCpkT: 'CPK target', ptScen: 'Scenario', ptSel: 'selected', ptBand: 'band',
+  ptCpkRule: 'Raise spend when partner CPK is below the band, keep within it, stop above it. Measured per partner (paid ads ÷ kg) until ads are tagged in Odoo.',
+  ptRaise: 'Raise spend', ptKeep: 'Keep spend', ptStop: 'Stop spend',
+  ptReady: 'Launch readiness', ptReadySub: 'Must be in place before a partner launches, or its leads cannot be counted',
+  rdSrc: 'Odoo source linked in Settings', rdAds: 'Ads named with the partner found', rdPage: 'Partner page ready and launch message agreed', rdPch: 'Partner channels activated', rdAch: 'Awon channels activated',
+  rdAuto: 'Automatic', rdManual: 'Ticked in Settings',
+  ptNotes: ['Odoo has no ad-level tag (utm_content) on leads, so uplift uses the platform lead count without the Odoo cap, and CPK is per partner, not per ad.', 'Meta counts Website leads here, the number the benchmark is built on.', 'Lost leads with the reasons duplicate, prohibited items and out of coverage are removed from direct leads.'],
+  // settings
+  sePtBench: 'Partner benchmarks (leads per $1,000)', sePtCpk: 'Partner CPK scenarios (USD per kg)', seEnd: 'End', seCities: 'Cities', seAliases: 'Other spellings in ad names',
+  seAliasHint: 'Type a spelling and press Enter', seCityHint: 'Type a city and press Enter', seCosts: 'Other costs (not paid ads)', seCostAdd: 'Add a cost', seCostName: 'Item', seCostAmt: 'Cost this month (USD)',
+  seChecks: 'Launch checklist', ckPage: 'Partner page and launch message', ckPch: 'Partner channels', ckAch: 'Awon channels', seBand: 'Band (e.g. 0.03 = ±3%)', seScen: n => `Scenario ${n}`, sePick: 'Selected scenario',
+});
+Object.assign(T.ar, {
+  ptTitle: 'ليدز الشراكات', ptSub: 'الليد المباشر من مصدر الشريك + الزيادة على البنش مارك في إعلانات الشريك',
+  ptOfLeads: 'من', ptLeadsU: 'ليد', ptShould: 'المفروض حتى اليوم', ptLeft: 'المتبقي', ptTargetL: 'الهدف',
+  ptDirect: 'الليد المباشر', ptDirectSub: 'من مصدر الشريك في أودو · أساس الهدف', ptUplift: 'الزيادة على البنش مارك', ptUpliftSub: 'من فيديوهات الشريك في إعلاناتنا',
+  ptEq: 'الليد المباشر + الزيادة = ليدز الشراكات', ptKgT: 'الوزن المستلم', ptSpendT: 'صرف الشراكات', ptSpendSub: (a, b) => `إعلانات ${a} + تكاليف أخرى ${b}`,
+  ptCards: 'الشركاء', ptCardsSub: 'كل شريك مقابل هدفه حتى اليوم',
+  wfGross: 'بمصدر الشريك', wfDup: 'مكررة', wfProh: 'مواد ممنوعة', wfOut: 'خارج التغطية', wfValid: 'المباشر الصالح',
+  ptAdsN: n => `الزيادة من الإعلانات (${n})`, ptTotal: 'إجمالي الشريك', ptOfT: (a, b) => `${a} من ${b}`,
+  ptPick: 'الاستلامات', ptKg: 'الوزن المستلم', ptPaid: 'الإعلانات', ptOther: 'تكاليف أخرى', ptSpend: 'إجمالي الصرف', ptCpl: 'تكلفة الليد', ptCpk: 'تكلفة الكيلو',
+  ptOnTrack: 'على المسار', ptBehind: 'متأخر', ptAhead: 'متقدم', ptNoTarget: 'لا يوجد هدف', ptNotStarted: 'لم يبدأ',
+  ptNone: 'لا يوجد شركاء بعد. أضف كل شريك في الإعدادات: الاسم، مصدر أودو، الأهداف، أسماء الإعلانات والتكاليف الأخرى.', ptGo: 'فتح الإعدادات',
+  ptAds: 'إعلانات الشركاء', ptAdsSub: 'إعلانات اسم حملتها أو مجموعتها أو الإعلان نفسه يحمل اسم الشريك · كل إعلان لحاله · لا يوجد سالب',
+  ptAdCols: ['الشريك', 'الإعلان', 'المنصة · المدينة', 'الصرف', 'البنش /$1k', 'المتوقع', 'الفعلي', 'المحسوب', 'الحالة'],
+  ptAbove: 'فوق المتوقع · تُحسب الزيادة', ptBelow: 'تحت المتوقع · نوقف الصرف وتُحسب ليدزه', ptNoBench: 'لا يوجد بنش مارك لهذه المنصة',
+  ptFuzzy: 'الاسم قريب من اسم الشريك: تأكد من الإملاء أو أضفه كاسم بديل', ptMatchedOn: { ad: 'الإعلان', adset: 'المجموعة', campaign: 'الحملة' },
+  ptNoAds: 'لا توجد إعلانات بأسماء الشركاء في هذه الفترة.',
+  ptBench: 'البنش مارك', ptBenchSub: 'ليدز لكل 1,000$ من حملات الليدز المعتادة، أكتوبر 2026 · يُعدّل من الإعدادات',
+  ptAll: 'كل المدن', ptBenchNote: 'المدينة الفارغة تأخذ رقم المنصة الكلي.',
+  ptCpkT: 'تكلفة الكيلو المستهدفة', ptScen: 'السيناريو', ptSel: 'المختار', ptBand: 'النطاق',
+  ptCpkRule: 'نرفع الصرف إذا تكلفة كيلو الشريك أقل من النطاق، نستمر داخله، ونوقف فوقه. تُقاس لكل شريك (الإعلانات ÷ الكيلو) حتى تُوسم الإعلانات في أودو.',
+  ptRaise: 'نرفع الصرف', ptKeep: 'نستمر بنفس الصرف', ptStop: 'نوقف الصرف',
+  ptReady: 'جاهزية الإطلاق', ptReadySub: 'لازم تكتمل قبل إطلاق أي شريك حتى يُحسب الليد',
+  rdSrc: 'مصدر أودو مربوط في الإعدادات', rdAds: 'إعلانات باسم الشريك موجودة', rdPage: 'صفحة الشريك جاهزة ورسالة الإطلاق متفق عليها', rdPch: 'قنوات الشريك مفعلة', rdAch: 'قنوات عون مفعلة',
+  rdAuto: 'تلقائي', rdManual: 'يُحدد في الإعدادات',
+  ptNotes: ['أودو لا يحفظ وسم الإعلان (utm_content) على الليد، لذلك الزيادة تعتمد على ليدز المنصة بدون سقف أودو، وتكلفة الكيلو لكل شريك وليس لكل إعلان.', 'ميتا تُحسب هنا بـ Website leads، وهو الرقم الذي بُني عليه البنش مارك.', 'الليدز المفقودة بسبب التكرار أو المواد الممنوعة أو خارج التغطية تُخصم من الليد المباشر.'],
+  sePtBench: 'بنش مارك الشراكات (ليدز لكل 1,000$)', sePtCpk: 'سيناريوهات تكلفة الكيلو للشراكات', seEnd: 'النهاية', seCities: 'المدن', seAliases: 'كتابات أخرى للاسم في الإعلانات',
+  seAliasHint: 'اكتب الاسم واضغط Enter', seCityHint: 'اكتب المدينة واضغط Enter', seCosts: 'تكاليف أخرى (غير الإعلانات)', seCostAdd: 'إضافة تكلفة', seCostName: 'البند', seCostAmt: 'التكلفة هذا الشهر (دولار)',
+  seChecks: 'قائمة الإطلاق', ckPage: 'صفحة الشريك ورسالة الإطلاق', ckPch: 'قنوات الشريك', ckAch: 'قنوات عون', seBand: 'النطاق (0.03 = ±3%)', seScen: n => `السيناريو ${n}`, sePick: 'السيناريو المختار',
+});
+const PB_CITIES = ['jeddah', 'riyadh', 'eastern', 'madina', 'asir', 'taif', 'mecca', 'qassim'];
+const PB_PLATS = ['tiktok', 'snapchat', 'meta'];
+const CITY_LBL = { en: { jeddah: 'Jeddah', riyadh: 'Riyadh', eastern: 'Eastern', madina: 'Madina', asir: 'Asir', taif: 'Taif', mecca: 'Mecca', qassim: 'Qassim' },
+  ar: { jeddah: 'جدة', riyadh: 'الرياض', eastern: 'الشرقية', madina: 'المدينة', asir: 'عسير', taif: 'الطائف', mecca: 'مكة', qassim: 'القصيم' } };
+const normName = s => String(s || '').toLowerCase().replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+  .replace(/[^a-z0-9؀-ۿ]+/g, ' ').trim();
+function lev(a, b) {
+  if (a === b) return 0; let p = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) { const c = [i]; for (let j = 1; j <= b.length; j++) c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = c; }
+  return p[b.length];
+}
+// 'exact' when the name contains the term (ignoring case, spaces, symbols and Arabic letter forms), 'fuzzy' when it is 1-2 letters off
+function matchTerm(name, term) {
+  const n = normName(name), tt = normName(term); if (!n || !tt) return null;
+  const toks = n.split(' '), tc = tt.replace(/ /g, '');
+  if (tc.length < 4) return toks.some(x => x === tc) || n.includes(tt) && new RegExp('(^| )' + tt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '( |$)').test(n) ? 'exact' : null;
+  if (n.replace(/ /g, '').includes(tc)) return 'exact';
+  const k = tc.length >= 8 ? 2 : 1, tn = tt.split(' ').length;
+  for (let w = Math.max(1, tn - 1); w <= tn + 1; w++) for (let i = 0; i + w <= toks.length; i++) {
+    const c = toks.slice(i, i + w).join(''); if (Math.abs(c.length - tc.length) <= k && lev(c, tc) <= k) return 'fuzzy';
+  }
+  return null;
+}
+const CITY_RX = [['riyadh', /riyadh|رياض/], ['jeddah', /jeddah|jedda|جده/], ['mecca', /makkah|mecca|makka|مكه/], ['madina', /madina|medina|madinah|medinah|مدينه/],
+  ['eastern', /sharqia|sharqiya|eastern|dammam|khobar|شرقيه/], ['asir', /asir|abha|عسير|ابها/], ['taif', /taif|طايف|طائف/], ['qassim', /qassim|buraydah|قصيم/]];
+const cityOfText = s => { const n = normName(s); for (const [k, rx] of CITY_RX) if (rx.test(n)) return k; return ''; };
+
+function ptData(ds, from, to) {
+  const kp = ds.kpi || {}, P = (settings.partners || []).filter(p => p.name && p.name.trim());
+  const inRange = (d, p) => d >= from && d <= to && (!p.start || d >= p.start) && (!p.end || d <= p.end);
+  const res = P.map(p => ({ p, srcs: new Set(p.sources || []), valid: 0, dup: 0, proh: 0, out: 0, recv: 0, kg: 0, ads: {}, nonPaid: (p.costs || []).reduce((a, c) => a + (Number(c.cost) || 0), 0) }));
+  for (const r of res) {
+    for (const [d, id, n] of kp.leads || []) if (r.srcs.has(id) && inRange(d, r.p)) r.valid += n;
+    for (const [d, id, rs, n] of kp.lost || []) if (r.srcs.has(id) && inRange(d, r.p)) { if (rs === 36) r.dup += n; else if (rs === 37) r.proh += n; else if (rs === 40) r.out += n; }
+    for (const [d, id, n, kg] of kp.recv || []) if (r.srcs.has(id) && inRange(d, r.p)) { r.recv += n; r.kg += kg; }
+  }
+  const adet = (ds.ads && ds.ads.adet) || {}, terms = res.map(r => [r.p.name, ...(r.p.aliases || [])].filter(Boolean)), memo = new Map();
+  const m1 = (nm, i) => { const k = i + '\u0001' + nm; if (!memo.has(k)) { let q = null; for (const tm of terms[i]) { const m = matchTerm(nm, tm); if (m === 'exact') { q = 'exact'; break; } if (m) q = 'fuzzy'; } memo.set(k, q); } return memo.get(k); };
+  for (const plat of AD_PLATS) for (const [d, c, as, ad, sp, ld] of adet[plat] || []) {
+    if (d < from || d > to) continue;
+    let best = null;
+    res.forEach((r, i) => {
+      if (!inRange(d, r.p)) return;
+      for (const [lvl, nm] of [['ad', ad], ['adset', as], ['campaign', c]]) { if (!nm) continue; const q = m1(nm, i); if (q) { if (!best || (q === 'exact' && best.q !== 'exact')) best = { i, q, lvl, nm }; break; } }
+    });
+    if (!best) continue;
+    const r = res[best.i], key = plat + '|' + c + '|' + as + '|' + ad;
+    const a = r.ads[key] || (r.ads[key] = { plat, c, as, ad, city: cityOfText(c + ' ' + as + ' ' + ad), spend: 0, leads: 0, q: best.q, lvl: best.lvl, nm: best.nm });
+    a.spend += sp; a.leads += ld; if (best.q === 'fuzzy') a.q = 'fuzzy';
+  }
+  const B = settings.partnerBench || {}, n = res.length, PT = settings.partnerTargets || {};
+  for (const r of res) {
+    r.adList = Object.values(r.ads).filter(a => a.spend > 0 || a.leads > 0).sort((a, b) => b.spend - a.spend);
+    r.paid = 0; r.uplift = 0;
+    for (const a of r.adList) {
+      r.paid += a.spend;
+      const bp = B[a.plat] || {}; a.bench = (a.city && bp[a.city]) || bp.all || null;
+      a.expected = a.bench ? a.spend / 1000 * a.bench : null;
+      if (a.expected == null) { a.counted = 0; a.state = 'nobench'; }
+      else if (a.leads >= a.expected) { a.counted = a.leads - a.expected; a.state = 'above'; }
+      else { a.counted = a.leads; a.state = 'below'; }
+      r.uplift += a.counted;
+    }
+    r.uplift = Math.round(r.uplift); r.gross = r.valid + r.dup + r.proh + r.out;
+    r.total = r.valid + r.uplift; r.spend = r.paid + r.nonPaid;
+    r.tLeads = r.p.leads != null ? r.p.leads : (PT.leads && n ? PT.leads / n : null);
+    r.tKg = r.p.kg != null ? r.p.kg : (PT.kg && n ? PT.kg / n : null);
+  }
+  return res;
+}
+function ptPace(to) { const m = to.slice(0, 7); return Math.min(1, +to.slice(8) / dim(m)); }
+function ptStatus(v, should) {
+  if (should == null || !(should > 0)) return ['', t('ptNoTarget'), 'idle'];
+  const r = v / should; return [r, r >= 1.1 ? t('ptAhead') : r >= 0.95 ? t('ptOnTrack') : t('ptBehind'), r >= 0.95 ? 'good' : r >= 0.8 ? 'warn' : 'bad'];
+}
+function cpkAction(cpk) {
+  const C = settings.partnerCpk || {}, tg = (C.s || [])[(C.pick || 2) - 1], band = C.band == null ? 0.03 : C.band;
+  if (cpk == null || !tg) return null;
+  return cpk < tg * (1 - band) ? ['good', t('ptRaise')] : cpk > tg * (1 + band) ? ['bad', t('ptStop')] : ['warn', t('ptKeep')];
+}
+function partnersTab(ds, from, to) {
+  const R = ptData(ds, from, to), PT = settings.partnerTargets || {}, f = ptPace(to), CL = CITY_LBL[lang];
+  const head = `<div class="sec-h"><h2>${esc(t('ptTitle'))}</h2><p>${esc(fDate(from))} – ${esc(fDate(to))} · ${esc(t('ptSub'))}</p></div>`;
+  if (!R.length) return `${head}<div class="panel"><p class="muted">${esc(t('ptNone'))}</p><a href="#set" class="chip" data-goset>${esc(t('ptGo'))}</a></div>`;
+  const tot = k => R.reduce((a, r) => a + (r[k] || 0), 0);
+  const total = tot('total'), direct = tot('valid'), uplift = tot('uplift'), kg = tot('kg'), paid = tot('paid'), other = tot('nonPaid'), spend = paid + other;
+  const target = PT.leads || R.reduce((a, r) => a + (r.tLeads || 0), 0) || null, kgT = PT.kg || R.reduce((a, r) => a + (r.tKg || 0), 0) || null;
+  const should = target ? target * f : null, [pr, pl, pc] = ptStatus(total, should);
+  const bar = (v, tg, sh, cls) => tg ? `<div class="bar sp-bar"><i class="${cls === 'bad' ? 'bad' : cls === 'warn' ? 'warn' : ''}" style="width:${Math.min(100, v / tg * 100)}%"></i><b class="mark" style="inset-inline-start:${Math.min(100, sh / tg * 100)}%"></b></div>` : '';
+  const hero = `<div class="pt-hero"><div class="panel sp-card"><div class="sp-top"><div class="sp-big">${num(fN(total))}<small>${esc(t('ptOfLeads'))} ${num(fN(target))} ${esc(t('ptLeadsU'))}</small></div>${pr !== '' ? `<span class="dchip ${pc}">${esc(pl)} · ${num(fP(pr))}</span>` : ''}</div>
+    ${bar(total, target, should, pc)}<div class="sp-row"><span>${esc(t('ptTargetL'))} ${num(fN(target))}</span><span>${esc(t('ptShould'))} ${num(fN(should))}</span><span>${esc(t('ptLeft'))} ${num(fN(target ? target - total : null))}</span></div></div>
+    <div class="pt-tiles"><div class="panel pt-tile dk"><div class="k">① ${esc(t('ptDirect'))}</div><div class="v">${num(fN(direct))}</div><div class="s">${esc(t('ptDirectSub'))}</div></div>
+    <div class="panel pt-tile"><div class="k">② ${esc(t('ptUplift'))}</div><div class="v">${num(fN(uplift))}</div><div class="s">${esc(t('ptUpliftSub'))}</div></div>
+    <div class="panel pt-tile"><div class="k">${esc(t('ptKgT'))}</div><div class="v">${num(fN(kg))} <small>kg</small></div><div class="s">${kgT ? esc(t('ptTargetL')) + ' ' + num(fN(kgT)) + ' kg · ' + esc(t('ptShould')) + ' ' + num(fN(kgT * f)) : ''}</div></div>
+    <div class="panel pt-tile"><div class="k">${esc(t('ptSpendT'))}</div><div class="v">${num(fUSD(spend))}</div><div class="s">${esc(t('ptSpendSub')(fUSD(paid), fUSD(other)))} · ${esc(t('ptCpk'))} ${num(fUSD(div(spend, kg), 3))}</div></div></div></div>
+    <p class="muted sm pt-eq">${esc(t('ptEq'))}</p>`;
+  const card = r => {
+    const p = r.p, sh = r.tLeads ? r.tLeads * f : null, [rr, rl, rc] = (p.start && p.start > to) ? ['', t('ptNotStarted'), 'idle'] : ptStatus(r.total, sh), mx = Math.max(1, r.gross);
+    const col = (v, cls, lab) => `<div><span class="num ${cls}">${v}</span><i class="${cls}" style="height:${Math.max(3, Math.abs(+String(v).replace(/[^\d]/g, '')) / mx * 100)}%"></i><em>${esc(lab)}</em></div>`;
+    const ca = cpkAction(div(r.paid, r.kg));
+    return `<div class="panel pt-card"><div class="pt-ch"><div><h3 dir="auto">${esc(p.name)}</h3><div class="muted sm">${esc((p.cities || []).join(' · ') || '')}${p.start ? ' · ' + esc(fDate(p.start)) : ''}${p.end ? ' – ' + esc(fDate(p.end)) : ''} · ${esc((p.sources || []).map(id => srcName(ds, id)).join(', ') || '–')}</div></div><span class="dchip ${rc}">${esc(rl)}${rr !== '' ? ' · ' + num(fP(rr)) : ''}</span></div>
+      <div class="pt-wf">${col(fN(r.gross), 'g', t('wfGross'))}${col('−' + fN(r.dup), 'r', t('wfDup'))}${col('−' + fN(r.proh), 'r', t('wfProh'))}${col('−' + fN(r.out), 'r', t('wfOut'))}${col(fN(r.valid), 't', t('wfValid'))}</div>
+      <dl class="pt-kv"><dt>${esc(t('ptDirect'))}</dt><dd>${num(fN(r.valid))}</dd><dt>${esc(t('ptAdsN')(r.adList.length))}</dt><dd>${num(fN(r.uplift))}</dd><dt class="b">${esc(t('ptTotal'))}</dt><dd class="b">${num(fN(r.total))}</dd></dl>
+      ${r.tLeads ? `<div class="pt-mini"><i class="${rc}" style="width:${Math.min(100, r.total / r.tLeads * 100)}%"></i><b style="inset-inline-start:${Math.min(100, f * 100)}%"></b></div><div class="muted sm">${num(fN(r.total))} / ${num(fN(r.tLeads))} · ${esc(t('ptShould'))} ${num(fN(sh))}</div>` : ''}
+      <dl class="pt-kv"><dt>${esc(t('ptPick'))}</dt><dd>${num(fN(r.recv))}</dd><dt>${esc(t('ptKg'))}</dt><dd>${num(fN(r.kg))} kg${r.tKg ? ` <small class="muted">/ ${num(fN(r.tKg))}</small>` : ''}</dd></dl>
+      <dl class="pt-kv"><dt>${esc(t('ptPaid'))}</dt><dd>${num(fUSD(r.paid))}</dd><dt>${esc(t('ptOther'))}</dt><dd>${num(fUSD(r.nonPaid))}</dd><dt class="b">${esc(t('ptSpend'))}</dt><dd class="b">${num(fUSD(r.spend))}</dd>
+      <dt>${esc(t('ptCpl'))}</dt><dd>${num(fUSD(div(r.spend, r.total), 2))}</dd><dt>${esc(t('ptCpk'))}</dt><dd>${num(fUSD(div(r.spend, r.kg), 3))}</dd></dl>
+      ${ca ? `<div class="pt-act"><span class="dchip ${ca[0]}">${esc(ca[1])}</span> <span class="muted sm">${esc(t('ptCpk'))} (${esc(t('ptPaid'))}) ${num(fUSD(div(r.paid, r.kg), 3))}</span></div>` : ''}</div>`;
+  };
+  const cards = `<div class="sec-h"><h2>${esc(t('ptCards'))}</h2><p>${esc(t('ptCardsSub'))}</p></div><div class="pt-cards">${R.map(card).join('')}</div>`;
+  const ads = R.flatMap(r => r.adList.map(a => ({ ...a, pn: r.p.name })));
+  const C = t('ptAdCols');
+  const adTable = `<div class="sec-h"><h2>${esc(t('ptAds'))}</h2><p>${esc(t('ptAdsSub'))}</p></div><div class="panel">${ads.length ? `<div class="tbl-wrap"><table class="lst pt-ads"><thead><tr>${C.map((c, i) => `<th${i >= 3 && i <= 7 ? ' class="n"' : ''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+    ${ads.map(a => `<tr><td dir="auto">${esc(a.pn)}</td><td dir="auto" class="pt-an">${esc([a.c, a.as, a.ad].filter(Boolean).join(' › '))}<small class="muted">${esc(t('ptMatchedOn')[a.lvl])}: ${esc(a.nm)}</small>${a.q === 'fuzzy' ? `<small class="pt-fz">${esc(t('ptFuzzy'))}</small>` : ''}</td>
+      <td>${esc(t(a.plat))}${a.city ? ' · ' + esc(CL[a.city]) : ''}</td><td class="n">${num(fUSD(a.spend))}</td><td class="n">${num(fN(a.bench))}</td><td class="n">${num(fN(a.expected))}</td><td class="n">${num(fN(a.leads))}</td><td class="n"><b>${num(fN(a.counted))}</b></td>
+      <td><span class="dchip ${a.state === 'above' ? 'good' : a.state === 'below' ? 'bad' : ''}">${esc(a.state === 'above' ? t('ptAbove') : a.state === 'below' ? t('ptBelow') : t('ptNoBench'))}</span></td></tr>`).join('')}
+    <tr class="tot"><td>${esc(t('total') || 'Total')}</td><td></td><td></td><td class="n">${num(fUSD(paid))}</td><td></td><td class="n">${num(fN(ads.reduce((s, a) => s + (a.expected || 0), 0)))}</td><td class="n">${num(fN(ads.reduce((s, a) => s + a.leads, 0)))}</td><td class="n"><b>${num(fN(uplift))}</b></td><td></td></tr></tbody></table></div>`
+    : `<p class="muted">${esc(t('ptNoAds'))}</p>`}</div>`;
+  const B = settings.partnerBench || {}, Cp = settings.partnerCpk || {};
+  const vals = PB_PLATS.flatMap(p => PB_CITIES.map(c => (B[p] || {})[c]).filter(v => v != null)), lo = Math.min(...vals), hi = Math.max(...vals);
+  const shade = v => { const x = hi > lo ? (v - lo) / (hi - lo) : 1; return `background:rgba(12,163,157,${(0.12 + x * 0.88).toFixed(2)});color:${x > 0.45 ? '#fff' : 'var(--ink)'}`; };
+  const bench = `<div class="sec-h"><h2>${esc(t('ptBench'))}</h2><p>${esc(t('ptBenchSub'))}</p></div><div class="pt-g2"><div class="panel"><div class="tbl-wrap"><table class="pt-bm"><tr><th></th>${PB_PLATS.map(p => `<th>${esc(t(p))}</th>`).join('')}</tr>
+    ${PB_CITIES.map(c => `<tr><th scope="row">${esc(CL[c])}</th>${PB_PLATS.map(p => { const v = (B[p] || {})[c]; return v != null ? `<td style="${shade(v)}">${num(fN(v))}</td>` : `<td class="fb">${num(fN((B[p] || {}).all))}*</td>`; }).join('')}</tr>`).join('')}
+    <tr class="all"><th scope="row">${esc(t('ptAll'))}</th>${PB_PLATS.map(p => `<td>${num(fN((B[p] || {}).all))}</td>`).join('')}</tr></table></div><p class="muted sm">* ${esc(t('ptBenchNote'))}</p></div>
+    <div class="panel"><h3 class="ch">${esc(t('ptCpkT'))}</h3><table class="lst"><tr><th>${esc(t('ptScen'))}</th><th class="n">${esc(t('ptCpkT'))}</th><th class="n">±${num(fN((Cp.band == null ? 0.03 : Cp.band) * 100, 0))}% ${esc(t('ptBand'))}</th></tr>
+    ${(Cp.s || []).map((v, i) => { const b = Cp.band == null ? 0.03 : Cp.band; return `<tr${(Cp.pick || 2) === i + 1 ? ' class="sel"' : ''}><td>${num(i + 1)}${(Cp.pick || 2) === i + 1 ? ' · ' + esc(t('ptSel')) : ''}</td><td class="n">${num(fUSD(v, 3))}</td><td class="n">${v ? num(fUSD(v * (1 - b), 3) + ' – ' + fUSD(v * (1 + b), 3)) : ''}</td></tr>`; }).join('')}</table>
+    <p class="muted sm">${esc(t('ptCpkRule'))}</p></div></div>`;
+  const ck = v => v ? '<span class="pt-y">✓</span>' : '<span class="pt-x">✗</span>';
+  const ready = `<div class="sec-h"><h2>${esc(t('ptReady'))}</h2><p>${esc(t('ptReadySub'))}</p></div><div class="panel"><div class="tbl-wrap"><table class="lst"><thead><tr><th></th><th></th>${R.map(r => `<th dir="auto">${esc(r.p.name)}</th>`).join('')}</tr></thead><tbody>
+    ${[['rdSrc', 'rdAuto', r => (r.p.sources || []).length > 0], ['rdAds', 'rdAuto', r => r.adList.length > 0], ['rdPage', 'rdManual', r => r.p.checks && r.p.checks.page], ['rdPch', 'rdManual', r => r.p.checks && r.p.checks.partnerCh], ['rdAch', 'rdManual', r => r.p.checks && r.p.checks.awonCh]]
+      .map(([k, h, fn]) => `<tr><td>${esc(t(k))}</td><td class="muted sm">${esc(t(h))}</td>${R.map(r => `<td>${ck(fn(r))}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  const notes = `<ul class="notes">${t('ptNotes').map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  return `${head}${hero}${cards}${adTable}${bench}${ready}${notes}`;
+}
+function partnerSettingsHTML(ds) {
+  const B = settings.partnerBench, Cp = settings.partnerCpk, CL = CITY_LBL[lang];
+  const cityOpts = Object.values(CITY_LBL.en).concat(Object.values(CITY_LBL.ar)).map(c => `<option value="${esc(c)}">`).join('');
+  const chk = (path, v, lab) => `<label class="se-ck"><input type="checkbox" data-path="${path}" ${v ? 'checked' : ''}> ${esc(lab)}</label>`;
+  return `<datalist id="dl-city">${cityOpts}</datalist>
+  <section class="panel se-card"><h3 class="ch">${esc(t('sePt'))}</h3><div class="se-grid">
+    ${fld(t('tgtActive'), inp('partnerTargets.active', settings.partnerTargets.active))}${fld(t('tgtLeads'), inp('partnerTargets.leads', settings.partnerTargets.leads, 'number'))}${fld(t('tgtKg'), inp('partnerTargets.kg', settings.partnerTargets.kg, 'number'))}</div>
+    ${(settings.partners || []).map((p, i) => `<div class="se-item"><div class="se-grid">${fld(t('name'), inp(`partners.${i}.name`, p.name))}${fld(t('start'), inp(`partners.${i}.start`, p.start, 'date'))}${fld(t('seEnd'), inp(`partners.${i}.end`, p.end, 'date'))}
+      ${fld(t('tgtLeads'), inp(`partners.${i}.leads`, p.leads, 'number'))}${fld(t('tgtKg'), inp(`partners.${i}.kg`, p.kg, 'number'))}</div>
+      ${fld(t('sources'), chipsField(`partners.${i}.sources`, p.sources || [], t('srcHint'), 'dl-src'))}
+      ${fld(t('seCities'), chipsField(`partners.${i}.cities`, p.cities || [], t('seCityHint'), 'dl-city'))}
+      ${fld(t('seAliases'), chipsField(`partners.${i}.aliases`, p.aliases || [], t('seAliasHint'), 'dl-none'))}
+      <div class="se-sub"><b>${esc(t('seCosts'))}</b>${(p.costs || []).map((c, j) => `<div class="se-grid">${fld(t('seCostName'), inp(`partners.${i}.costs.${j}.name`, c.name))}${fld(t('seCostAmt'), inp(`partners.${i}.costs.${j}.cost`, c.cost, 'number', 'min="0" step="1" inputmode="decimal"'))}<button class="chip" data-delcost="${i}.${j}">${esc(t('remove'))}</button></div>`).join('')}
+        <button class="chip" data-newcost="${i}">+ ${esc(t('seCostAdd'))}</button></div>
+      <div class="se-sub"><b>${esc(t('seChecks'))}</b><div class="se-cks">${chk(`partners.${i}.checks.page`, p.checks && p.checks.page, t('ckPage'))}${chk(`partners.${i}.checks.partnerCh`, p.checks && p.checks.partnerCh, t('ckPch'))}${chk(`partners.${i}.checks.awonCh`, p.checks && p.checks.awonCh, t('ckAch'))}</div></div>
+      <button class="chip" data-del="partners.${i}">${esc(t('remove'))}</button></div>`).join('')}
+    <button class="chip" data-new="partners">+ ${esc(t('add'))}</button>
+    <div class="se-sub"><b>${esc(t('sePtBench'))}</b><div class="tbl-wrap"><table class="se-bm"><tr><th></th>${PB_PLATS.map(p => `<th>${esc(t(p))}</th>`).join('')}</tr>
+      ${['all', ...PB_CITIES].map(c => `<tr><th scope="row">${esc(c === 'all' ? t('ptAll') : CL[c])}</th>${PB_PLATS.map(p => `<td>${inp(`partnerBench.${p}.${c}`, (B[p] || {})[c], 'number', 'step="any" min="0"')}</td>`).join('')}</tr>`).join('')}</table></div></div>
+    <div class="se-sub"><b>${esc(t('sePtCpk'))}</b><div class="se-grid">${[0, 1, 2].map(k => fld(t('seScen')(k + 1), inp(`partnerCpk.s.${k}`, Cp.s[k], 'number', 'step="any" min="0"'))).join('')}
+      ${fld(t('sePick'), `<select data-path="partnerCpk.pick">${[1, 2, 3].map(k => `<option value="${k}" ${Cp.pick === k ? 'selected' : ''}>${k}</option>`).join('')}</select>`)}${fld(t('seBand'), inp('partnerCpk.band', Cp.band, 'number', 'step="any" min="0"'))}</div></div></section>`;
+}
+
 // ---------------- settings screen ----------------
 const uid = () => Math.random().toString(36).slice(2, 8);
 function srcName(ds, id) { const s = ((ds.kpi && ds.kpi.sources) || []).find(x => x[0] === id); return s ? s[1] : '#' + id; }
@@ -347,11 +569,7 @@ function settingsHTML(ds) {
     ${fld(t('seRefPr'), inp('refs.pickupRate', R.pickupRate, 'number', 'step="any"'))}${fld(t('seRefKgo'), inp('refs.kgPerOrder', R.kgPerOrder, 'number', 'step="any"'))}
     ${fld(t('seNr'), inp('noResultMin', settings.noResultMin, 'number', 'step="1"'))}</div></section>
 
-  <section class="panel se-card"><h3 class="ch">${esc(t('sePt'))}</h3><div class="se-grid">
-    ${fld(t('tgtActive'), inp('partnerTargets.active', settings.partnerTargets.active))}${fld(t('tgtLeads'), inp('partnerTargets.leads', settings.partnerTargets.leads, 'number'))}${fld(t('tgtKg'), inp('partnerTargets.kg', settings.partnerTargets.kg, 'number'))}</div>
-    ${(settings.partners || []).map((p, i) => `<div class="se-item"><div class="se-grid">${fld(t('name'), inp(`partners.${i}.name`, p.name))}${fld(t('start'), inp(`partners.${i}.start`, p.start, 'date'))}${fld(t('tgtLeads'), inp(`partners.${i}.leads`, p.leads, 'number'))}${fld(t('tgtKg'), inp(`partners.${i}.kg`, p.kg, 'number'))}</div>
-      ${fld(t('sources'), chipsField(`partners.${i}.sources`, p.sources || [], t('srcHint'), 'dl-src'))}<button class="chip" data-del="partners.${i}">${esc(t('remove'))}</button></div>`).join('')}
-    <button class="chip" data-new="partners">+ ${esc(t('add'))}</button></section>
+  ${partnerSettingsHTML(ds)}
 
   <section class="panel se-card"><h3 class="ch">${esc(t('seInit'))}</h3>
     ${(settings.initiatives || []).map((p, i) => `<div class="se-item"><div class="se-grid">${fld(t('name'), inp(`initiatives.${i}.name`, p.name))}
@@ -375,7 +593,7 @@ function wireSettings(root) {
   const mark = () => { dirty = true; status = ''; const s = $('#seStatus'); if (s) s.textContent = t('seUnsaved'); };
   root.addEventListener('input', e => {
     const el = e.target; if (!el.dataset || !el.dataset.path || el.tagName === 'DIV') return;
-    let v = el.value; if (el.type === 'number') v = v === '' ? null : Number(v);
+    let v = el.value; if (el.type === 'number') v = v === '' ? null : Number(v); if (el.type === 'checkbox') v = el.checked; if (/\.pick$/.test(el.dataset.path)) v = Number(v);
     if (/\.status$|\.owner$|\.metric$|\.dir$/.test(el.dataset.path) || el.type === 'text' || el.type === 'date') { /* keep as string */ }
     setPath(settings, el.dataset.path, v); mark();
     if (/\.metric$/.test(el.dataset.path)) renderSettings();
@@ -390,8 +608,10 @@ function wireSettings(root) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.rm != null) { const box = b.closest('.chips'), arr = getPath(settings, box.dataset.path) || [], v = b.dataset.rm; setPath(settings, box.dataset.path, arr.filter(x => String(x) !== v)); mark(); renderSettings(); }
     else if (b.dataset.del) { const [k, i] = b.dataset.del.split('.'); settings[k].splice(+i, 1); mark(); renderSettings(); }
-    else if (b.dataset.new) { settings[b.dataset.new].push(b.dataset.new === 'partners' ? { name: '', sources: [], start: '', leads: null, kg: null } : { name: '', status: 'planned', start: '', end: '', sources: [], leads: null }); mark(); renderSettings(); }
+    else if (b.dataset.new) { settings[b.dataset.new].push(b.dataset.new === 'partners' ? { name: '', sources: [], start: '', end: '', leads: null, kg: null, cities: [], aliases: [], costs: [], checks: {} } : { name: '', status: 'planned', start: '', end: '', sources: [], leads: null }); mark(); renderSettings(); }
     else if (b.dataset.newsvc) { const m = b.dataset.newsvc; settings.months[m] = settings.months[m] || {}; settings.months[m].services = settings.months[m].services || { budget: null, items: [] }; settings.months[m].services.items = settings.months[m].services.items || []; settings.months[m].services.items.push({ name: '', cost: null }); mark(); renderSettings(); }
+    else if (b.dataset.newcost != null) { const p = settings.partners[+b.dataset.newcost]; p.costs = p.costs || []; p.costs.push({ name: '', cost: null }); mark(); renderSettings(); }
+    else if (b.dataset.delcost) { const [i, j] = b.dataset.delcost.split('.'); settings.partners[+i].costs.splice(+j, 1); mark(); renderSettings(); }
     else if (b.dataset.delsvc) { const [m, i] = b.dataset.delsvc.split('.'); settings.months[m].services.items.splice(+i, 1); mark(); renderSettings(); }
     else if (b.dataset.madd != null) { const i = +b.dataset.madd, d = root.querySelector(`[data-mdate="${i}"]`).value, v = root.querySelector(`[data-mval="${i}"]`).value; if (d && v !== '') { settings.team[i].manual = { ...(settings.team[i].manual || {}), [d]: Number(v) }; mark(); renderSettings(); } }
     else if (b.id === 'seSave') save();
@@ -426,6 +646,12 @@ async function loadSettings() {
   settings = Object.assign(d, s || {});
   settings.refs = Object.assign({}, d.refs, (s && s.refs) || {}); settings.refs.leadsPer1000By = Object.assign({}, d.refs.leadsPer1000By, (s && s.refs && s.refs.leadsPer1000By) || {});
   settings.partnerTargets = Object.assign({}, d.partnerTargets, (s && s.partnerTargets) || {});
+  const sb = (s && s.partnerBench) || {};
+  settings.partnerBench = Object.fromEntries(Object.keys(d.partnerBench).map(p => { const v = sb[p]; return [p, v && Object.keys(v).length ? { ...v } : { ...d.partnerBench[p] }]; }));
+  settings.partnerCpk = Object.assign({}, d.partnerCpk, (s && s.partnerCpk) || {});
+  if (!Array.isArray(settings.partnerCpk.s) || settings.partnerCpk.s.every(v => v == null)) settings.partnerCpk.s = d.partnerCpk.s.slice();
+  if (settings.partnerCpk.band == null) settings.partnerCpk.band = d.partnerCpk.band;
+  settings.partners = (settings.partners || []).map(p => ({ cities: [], aliases: [], costs: [], checks: {}, end: '', ...p }));
   if (!settings.team || !settings.team.length) settings.team = d.team;
   saved = JSON.stringify(settings);
 }
@@ -436,13 +662,14 @@ function renderAll() {
   const hasKpi = ds && ds.kpi && ds.kpi.mode !== 'error' && ds.kpi.leads;
   const guard = fn => { try { return fn(); } catch (e) { console.error(e); return `<div class="err">${esc(e.message)}</div>`; } };
   const tab = $('#tab-set'); if (tab) tab.textContent = t('tabSet');
-  if (!hasKpi) { for (const id of ['kpiSpend', 'kpiPartners', 'kpiInit', 'kpiTeam']) box(id, ctx.ds ? `<div class="err warnbar">${esc(t('noKpi'))}</div>` : ''); }
+  if (!hasKpi) { for (const id of ['kpiSpend', 'kpiPartners', 'kpiInit', 'kpiTeam', 'kpiPt']) box(id, ctx.ds ? `<div class="err warnbar">${esc(t('noKpi'))}</div>` : ''); }
   else {
     if (!ctx.view || ctx.view === 'perf') {
       box('kpiSpend', guard(() => `<div class="kpi-sub"><div class="sec-h sub"><h3>${esc(t('spTitle'))}</h3><p>${esc(t('spSub'))}</p></div>${budgetCard(ds, to)}<div class="sec-h sub"><h3>${esc(t('mxTitle'))}</h3><p>${esc(t('mxSub'))}</p></div>${matrix(ds, from, to)}</div>`));
-      box('kpiPartners', guard(() => `<section class="kpi-sec">${partnerSection(ds, from, to)}</section>`));
+      box('kpiPartners', '');   // partnerships moved to their own tab
       box('kpiInit', guard(() => `<section class="kpi-sec">${initSection(ds, from, to)}</section>`));
     }
+    if (ctx.view === 'pt') box('kpiPt', guard(() => `<section class="kpi-sec pt">${partnersTab(ds, from, to)}</section>`));
     if (!ctx.view || ctx.view === 'mkt') box('kpiTeam', guard(() => `<section class="kpi-sec">${teamSection(ds, to)}</section>`));
   }
   if (ctx.view === 'set') renderSettings();

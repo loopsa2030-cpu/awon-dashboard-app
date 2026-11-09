@@ -15,7 +15,7 @@ const T = {
     spendNote: 'Daily spend against the prorated spend target (incl. overhead); CPK is a 7-day rolling average.',
     volNote: 'Dashed lines are the daily targets; the pickup target is spread over operating days only (no Fridays).',
     title: 'Performance dashboard', subtitle: 'Marketing, logistics and donors across Saudi Arabia',
-    refresh: 'Refresh', tabPerf: 'Performance', tabMkt: 'Marketing', tabMap: 'Donor map', tabSet: 'Settings',
+    refresh: 'Refresh', tabPerf: 'Performance', tabMkt: 'Marketing', tabMap: 'Donor map', tabPt: 'Partnerships', tabSet: 'Settings',
     all: 'All time', yesterday: 'Yesterday', last7: 'Last 7 days', thisMonth: 'This month', lastMonth: 'Last month', custom: 'Pick dates…',
     cmpLbl: 'Compare to', cmpPrev: 'Previous period', cmpMonth: 'Same days last month', cmpOff: 'No comparison', cmpCustom: 'Custom dates…', cmpEdit: 'Change dates', cmpLen: (a, b) => `${a} days vs ${b} days, totals not adjusted`, vs: r => `vs ${r}`, cmpNone: 'no earlier data to compare',
     northStar: 'North star: cost per kg collected', perKg: 'per kg',
@@ -75,7 +75,7 @@ const T = {
     spendNote: 'الإنفاق اليومي مقابل مستهدف الإنفاق (شاملاً المصاريف العامة)؛ تكلفة الكيلو متوسط ٧ أيام.',
     volNote: 'الخطوط المتقطعة هي المستهدف اليومي؛ مستهدف الاستلامات موزع على أيام التشغيل فقط (بدون الجمعة).',
     title: 'لوحة الأداء', subtitle: 'التسويق واللوجستيات والمتبرعون في المملكة',
-    refresh: 'تحديث', tabPerf: 'الأداء', tabMkt: 'التسويق', tabMap: 'خريطة المتبرعين', tabSet: 'الإعدادات',
+    refresh: 'تحديث', tabPerf: 'الأداء', tabMkt: 'التسويق', tabMap: 'خريطة المتبرعين', tabPt: 'الشراكات', tabSet: 'الإعدادات',
     all: 'كل الفترات', yesterday: 'أمس', last7: 'آخر ٧ أيام', thisMonth: 'هذا الشهر', lastMonth: 'الشهر الماضي', custom: 'اختيار التواريخ…',
     cmpLbl: 'قارن مع', cmpPrev: 'الفترة السابقة', cmpMonth: 'نفس الأيام من الشهر السابق', cmpOff: 'بدون مقارنة', cmpCustom: 'تواريخ مخصصة…', cmpEdit: 'تغيير التواريخ', cmpLen: (a, b) => `${a} يوماً مقابل ${b} يوماً، الإجماليات بدون تعديل`, vs: r => `مقارنة بـ ${r}`, cmpNone: 'لا توجد بيانات سابقة للمقارنة',
     northStar: 'المؤشر الأساسي: تكلفة الكيلوغرام المجمّع', perKg: 'لكل كغ',
@@ -718,7 +718,7 @@ $('#cmpSel').addEventListener('change', e => {
 });
 $('#cmpEdit').addEventListener('click', e => { e.stopPropagation(); picker.hidden || pk.target !== 'cmp' ? openPicker('cmp') : closePicker(); });
 function showTab(which) {
-  for (const k of ['perf', 'mkt', 'map', 'set']) { $('#tab-' + k).setAttribute('aria-selected', String(k === which)); $('#view-' + k).hidden = k !== which; }
+  for (const k of ['perf', 'mkt', 'pt', 'map', 'set']) { $('#tab-' + k).setAttribute('aria-selected', String(k === which)); $('#view-' + k).hidden = k !== which; }
   location.hash = which === 'perf' ? '' : which;
   if (which === 'map') ensureHeat();
   renderMap(); renderMkt(); renderKpi();
@@ -726,7 +726,7 @@ function showTab(which) {
 // New sections (spend quality, partners, initiatives, team, settings): public/kpi.js
 function renderKpi() {
   if (!window.AwonKpi || !dataset) return;
-  const view = ['perf', 'mkt', 'set'].find(k => !$('#view-' + k).hidden); if (!view) return;
+  const view = ['perf', 'mkt', 'pt', 'set'].find(k => !$('#view-' + k).hidden); if (!view) return;
   const { from, to } = resolve(state);
   AwonKpi.render({ ds: dataset, from, to, lang, view }).catch(e => console.error(e));
 }
@@ -738,12 +738,13 @@ function renderMkt() {
 $('#tab-perf').addEventListener('click', () => showTab('perf'));
 $('#tab-mkt').addEventListener('click', () => showTab('mkt'));
 $('#tab-map').addEventListener('click', () => showTab('map'));
+$('#tab-pt').addEventListener('click', () => showTab('pt'));
 $('#tab-set').addEventListener('click', () => showTab('set'));
 $$('[data-tview]').forEach(b => b.addEventListener('click', () => { tview = b.dataset.tview; try { localStorage.setItem('awon-tview', tview); } catch (e) {} renderTrend(); }));
 $$('[data-metric]').forEach(b => b.addEventListener('click', () => { metric = b.dataset.metric; $$('[data-metric]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderMap(); }));
 $$('[data-mcity]').forEach(b => b.addEventListener('click', () => { mcity = b.dataset.mcity; $$('[data-mcity]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderMap(); }));
 
-if (['#map', '#mkt', '#set'].includes(location.hash)) showTab(location.hash.slice(1));
+if (['#map', '#mkt', '#pt', '#set'].includes(location.hash)) showTab(location.hash.slice(1));
 render();
 // Show the last copy from this browser straight away, then load the fresh one
 readCachedDataset().then(d => { if (d && !dataset) { dataset = d; recompute(); } }).finally(() => load());

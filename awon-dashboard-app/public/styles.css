@@ -392,3 +392,41 @@ td .dl{white-space:nowrap}
 .in-card{overflow:hidden}.in-src{width:100%;table-layout:fixed}.in-src th:first-child,.in-src td:first-child{width:46%;overflow-wrap:anywhere}.in-src th,.in-src td{font-size:12px;padding:6px 4px}
 .in-src th:first-child,.in-src td:first-child{width:40%;word-break:break-all}.in-src th:not(:first-child),.in-src td:not(:first-child){width:20%}
 .in-src td:first-child{white-space:normal;overflow-wrap:anywhere;word-break:normal;hyphens:auto;min-width:0}.in-src th:not(:first-child){font-size:11px}
+
+/* ---------- partnerships tab ---------- */
+.pt .sec-h{margin-top:26px}
+.pt-hero{display:grid;grid-template-columns:1.2fr 1.6fr;gap:14px;align-items:stretch}
+.pt-hero>.sp-card{margin:0}
+.pt-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pt-tile{padding:14px 16px;margin:0}.pt-tile .k{color:var(--muted);font-size:13px}.pt-tile .v .num{font:600 26px/1.2 var(--display);color:var(--petrol)}.pt-tile .v small{color:var(--muted);font-size:13px}
+.pt-tile .s{color:var(--muted);font-size:12.5px;margin-top:2px}
+.pt-tile.dk{background:var(--petrol);border-color:var(--petrol)}.pt-tile.dk .k,.pt-tile.dk .s{color:#b9dcd9}.pt-tile.dk .v .num{color:#fff}
+.pt-eq{text-align:center;margin:8px 0 0}
+.dchip.idle{background:rgba(29,74,79,.07);color:var(--muted)}
+.pt-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.pt-card{padding:18px 20px;margin:0;min-width:0}
+.pt-ch{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.pt-ch h3{font:600 17px var(--display);margin:0;color:var(--petrol)}
+.pt-wf{display:flex;gap:6px;align-items:flex-end;height:150px;margin:14px 0 4px}
+.pt-wf>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.pt-wf .num{font:600 13px var(--display)}.pt-wf .num.r{color:var(--brick)}.pt-wf .num.t{color:var(--teal)}
+.pt-wf i{display:block;width:100%;border-radius:6px 6px 0 0;max-height:100px}.pt-wf i.g{background:var(--petrol)}.pt-wf i.r{background:var(--brick)}.pt-wf i.t{background:var(--teal)}
+.pt-wf em{font-style:normal;font-size:11px;color:var(--muted);text-align:center;line-height:1.25;height:28px;margin-top:4px}
+.pt-kv{display:grid;grid-template-columns:1fr auto;gap:5px 12px;margin:12px 0 0;padding-top:10px;border-top:1px dashed var(--line);font-size:14px}
+.pt-kv dt{margin:0}.pt-kv dd{margin:0;text-align:end}.pt-kv .b{font-weight:600;color:var(--petrol)}
+.pt-mini{position:relative;height:8px;background:rgba(29,74,79,.08);border-radius:99px;margin:12px 0 4px}
+.pt-mini i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;background:var(--teal)}.pt-mini i.bad{background:var(--brick)}.pt-mini i.warn{background:var(--gold)}
+.pt-mini b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--petrol)}
+.pt-act{margin-top:12px}
+.pt-ads td{vertical-align:top}.pt-an{white-space:normal;min-width:220px;max-width:360px}.pt-an small{display:block;font-size:11.5px}
+.pt-fz{color:#94620c}
+.pt-g2{display:grid;grid-template-columns:1.3fr 1fr;gap:14px}.pt-g2>.panel{margin:0;min-width:0}
+.pt-bm{width:100%;border-collapse:separate;border-spacing:4px}.pt-bm th{font:500 12.5px var(--body);color:var(--muted);text-align:center}.pt-bm th[scope=row]{text-align:start;color:var(--ink)}
+.pt-bm td{text-align:center;border-radius:8px;padding:6px 4px;font-weight:600}.pt-bm td.fb{border:1px dashed var(--line);color:var(--muted);font-weight:400}
+.pt-bm tr.all td{background:var(--petrol);color:#fff}
+.lst tr.sel td{background:rgba(12,163,157,.08);font-weight:600}
+.pt-y{color:#0a7f7a;font-weight:600}.pt-x{color:var(--brick);font-weight:600}
+.se-cks{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}.se-ck{display:flex;gap:6px;align-items:center;font-size:14px}
+.se-bm input{width:84px}.se-bm th{font-weight:500;font-size:13px;padding:4px 6px;text-align:start}.se-bm td{padding:3px}
+@media (max-width:900px){.pt-hero,.pt-g2{grid-template-columns:1fr}.pt-tiles{grid-template-columns:1fr 1fr}}
+.lst .n{text-align:end}
+.pt .sp-big small .num{font:inherit}
