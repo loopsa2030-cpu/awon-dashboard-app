@@ -26,6 +26,7 @@
   </div>
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-perf" aria-selected="true" aria-controls="view-perf" data-i18n="tabPerf">Performance</button>
+    <button class="tab" role="tab" id="tab-ops" aria-selected="false" aria-controls="view-ops" data-i18n="tabOps">Operations</button>
     <button class="tab" role="tab" id="tab-mkt" aria-selected="false" aria-controls="view-mkt" data-i18n="tabMkt">Marketing</button>
     <button class="tab" role="tab" id="tab-pt" aria-selected="false" aria-controls="view-pt" data-i18n="tabPt">Partnerships</button>
     <button class="tab" role="tab" id="tab-map" aria-selected="false" aria-controls="view-map" data-i18n="tabMap">Donor map</button>
@@ -107,6 +108,10 @@
     <div id="kpiTeam"></div>
   </div>
 
+  <div class="view" id="view-ops" role="tabpanel" aria-labelledby="tab-ops" hidden>
+    <div id="opsRoot"></div>
+  </div>
+
   <div class="view" id="view-pt" role="tabpanel" aria-labelledby="tab-pt" hidden>
     <div id="kpiPt"></div>
   </div>
@@ -147,6 +152,7 @@
 <script src="calc.js"></script>
 <script src="marketing.js"></script>
 <script src="kpi.js"></script>
+<script src="ops.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

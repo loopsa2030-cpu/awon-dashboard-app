@@ -145,7 +145,7 @@ function parseForecast(ws) {
     waBudget: col(/^wa budget/), waLeads: col(/^wa leads/),
     drivers: col(/^drivers/), days: col(/^days of op/),
     pickups: col(/^pickups ?\/ ?month/), avgKg: col(/^avg (kg|weight) ?\/ ?pickup/),
-    weight: col(/^expected monthly weight/),
+    weight: col(/^expected monthly weight/), totalLeads: col(/^total leads ?\/ ?month/), dailyLeads: col(/^daily leads$/),
   };
   let daysInMonth = null;
   for (let r = 0; r < Math.min(g.length, 60) && daysInMonth === null; r++) {
@@ -167,7 +167,7 @@ function parseForecast(ws) {
       organic: { budget: v('brandBudget'), leads: v('orgLeads') },
       wa: { budget: v('waBudget'), leads: v('waLeads') },
       drivers: v('drivers'), opDays: v('days'),
-      pickups: v('pickups'), avgKg: v('avgKg'), weight: v('weight'),
+      pickups: v('pickups'), avgKg: v('avgKg'), weight: v('weight'), totalLeads: v('totalLeads'), dailyLeads: v('dailyLeads'),
     });
   }
   // The sheet's Total row is the agreed target. If it leaves one city out (its sum is short by exactly that city's

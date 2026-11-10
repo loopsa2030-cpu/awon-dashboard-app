@@ -21,7 +21,7 @@ async function client() {
   let creds;
   try { creds = JSON.parse(raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8')); }
   catch (e) { throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON - paste the whole key file, from { to }.'); }
-  const auth = new GoogleAuth({ credentials: creds, scopes: ['https://www.googleapis.com/auth/drive.readonly'] });
+  const auth = new GoogleAuth({ credentials: creds, scopes: ['https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/spreadsheets.readonly'] });
   authClient = await auth.getClient();
   return authClient;
 }
@@ -67,4 +67,16 @@ async function workbook(which) {
 
 async function request(url) { const c = await client(); const res = await c.request({ url }); return res.data; }
 
-module.exports = { workbook, configured, request, MTD_FILE_ID, FORECAST_FILE_ID, WA_FILE_ID };
+// Sheets API (read only) - used by the operations sheet. Needs the Google Sheets API enabled on the service account's project.
+const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets/';
+async function sheetsCall(id, path, method = 'GET', data) {
+  const c = await client();
+  try { const res = await c.request({ url: SHEETS + id + path, method, data }); return res.data; }
+  catch (e) { const m = e.response && e.response.data && e.response.data.error && e.response.data.error.message; throw new Error('Google Sheets: ' + (m || e.message)); }
+}
+const rng = r => encodeURIComponent(r);
+const values = {
+  get: (id, range) => sheetsCall(id, `/values/${rng(range)}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`).then(d => d.values || []),
+};
+
+module.exports = { workbook, configured, request, values, MTD_FILE_ID, FORECAST_FILE_ID, WA_FILE_ID };

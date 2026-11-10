@@ -9,6 +9,7 @@ const history = require('./history');
 const wadata = require('./wadata');
 const snapshot = require('./snapshot');
 const kpi = require('./kpi');
+const ops = require('./ops');
 
 const TTL = 10 * 60 * 1000;
 let cached = null, building = null;
@@ -223,17 +224,19 @@ async function build() {
   const t0 = Date.now(), took = {};
   const timed = (k, p) => p.then(v => { took[k] = Date.now() - t0; return v; }, e => { took[k] = Date.now() - t0; throw e; });
   const kpiFrom = (() => { const d = new Date(to + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1, 1); return d.toISOString().slice(0, 10); })();
-  const [sh, wa, od, ad, kp] = await Promise.all([   // same order as the list below
+  const monthEnd = (() => { const d = new Date(to + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + 1, 0); return d.toISOString().slice(0, 10); })();
+  const [sh, wa, od, ad, kp, op] = await Promise.all([   // same order as the list below
     timed('sheets', sheetsPart(to)),
     timed('wa', withTimeout(wadata.load(), 60000, 'WhatsApp report')).catch(e => { notes.push('WhatsApp report: ' + e.message); return cached && cached.data.waReport ? { rows: cached.data.waReport.rows, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     timed('odoo', withTimeout(odooPart(to), 200000, 'Odoo')).catch(e => { notes.push('Odoo: ' + e.message); return cached ? { rows: cached.odoo.rows, donors: cached.data.donors, meta: { mode: 'cached', error: e.message } } : { rows: [], meta: { mode: 'error', error: e.message } }; }),
     timed('ads', withTimeout(adsPart(to, cached && cached.ads), 240000, 'Ad data')).catch(e => { notes.push(e.message); return cached ? { platforms: cached.ads.platforms, camps: cached.ads.camps || {}, cdet: cached.ads.cdet || {}, adet: cached.ads.adet || {}, ga: cached.ads.ga || [], fetchedAt: cached.ads.fetchedAt, source: cached.ads.source, meta: { mode: 'cached', errors: [e.message] } } : { platforms: {}, camps: {}, ga: [], meta: { mode: 'error', errors: [e.message] } }; }),
     timed('kpi', withTimeout(kpi.build(kpiFrom, to), 120000, 'KPI data')).catch(e => { notes.push('KPI data: ' + e.message); return cached && cached.data.kpi ? cached.data.kpi : { mode: 'error', error: e.message, sources: [], leads: [], recv: [], cohort: [] }; }),
+    timed('ops', withTimeout(ops.build(kpiFrom, monthEnd), 120000, 'Operations data')).catch(e => { notes.push('Operations data: ' + e.message); return cached && cached.data.ops ? cached.data.ops : { mode: 'error', error: e.message, drivers: {}, rows: [] }; }),
   ]);
   const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
     months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, cdet: ad.cdet || {}, adet: ad.adet || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
-    waReport: { rows: wa.rows }, kpi: kp,
+    waReport: { rows: wa.rows }, kpi: kp, ops: op,
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],
   };
