@@ -1,6 +1,6 @@
 // Operations sheet: one row per driver per day (tab "Daily by driver"), filled every night at 9 PM Saudi time for the
-// day before by a scheduled Claude task that reads Odoo. The dashboard only reads it, so corrections made by the
-// logistics team in the sheet show on the Operations tab.
+// whole month so far by a scheduled Claude task that syncs order counts from Odoo. Weight (column I) is entered by the
+// logistics team only; an empty weight reaches the dashboard as null (not entered yet), never as 0.
 const google = require('./google');
 
 const SHEET_ID = process.env.OPS_SHEET_ID || '1mPFoXmpeOdS4jxhKebev9y6XaZPtyLkuhTAwGt4EnAk';
@@ -37,7 +37,7 @@ const n = v => { const x = Number(String(v == null ? '' : v).replace(/[, ]/g, ''
 async function readAll() {
   const g = await google.values.get(SHEET_ID, `'${TAB}'!A2:J`);
   return g.map(r => ({ date: isoOf(r[0]), name: String(r[1] || '').trim(), city: CITY_KEY[String(r[2] || '').trim().toLowerCase()] || String(r[2] || '').trim().toLowerCase() || 'unknown',
-    orders: n(r[3]), rec: n(r[4]), can: n(r[5]), na: n(r[6]), post: n(r[7]), kg: n(r[8]) })).filter(r => r.date && r.name);
+    orders: n(r[3]), rec: n(r[4]), can: n(r[5]), na: n(r[6]), post: n(r[7]), kg: String(r[8] == null ? '' : r[8]).trim() === '' ? null : n(r[8]) })).filter(r => r.date && r.name);
 }
 
 // For the dashboard: the sheet's rows shaped like ds.ops ([date, driver, city, status, active, orders, kg])

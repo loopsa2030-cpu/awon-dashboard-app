@@ -1,5 +1,6 @@
 /* Awon dashboard: Operations tab. Daily logistics view by city and driver.
-   Orders, pickups and weight come from Odoo (ds.ops: orders by scheduled pickup day, driver, region and delivery status).
+   Orders and pickups come from the operations sheet (synced nightly from Odoo), or from Odoo (ds.ops) for days not in the sheet yet.
+   Weight comes only from the sheet's Weight column, entered by the logistics team.
    Leads come from Odoo too (ds.odoo.rows, valid leads by creation day and city); the daily lead target is the month's
    forecast tab (paid + organic + WhatsApp leads for the city, divided by the days in the month). */
 (function () {
@@ -17,6 +18,7 @@ const T = {
     hTitle: 'Weight by driver and day', hSub: 'kg received each day this month · Fridays shaded',
     none: 'No operations data for this day yet.', noData: 'Operations data is not available yet. It appears after the next data refresh.',
     notes: ['Orders are counted on their scheduled pickup day. A postponed order moves to its new day, so it is counted there.', 'Cancelled and no-answer orders count even when later archived in Odoo.', 'The daily lead target is the "Daily Leads" column of the month\'s latest forecast tab.'],
+    kgPend: n => `weight not entered for ${n} pickups`, kgNote: 'Weight comes only from the Weight column of the operations sheet, entered by the logistics team. – means not entered yet; * means entered for part of the pickups only. kg per pickup uses only pickups that have a weight.',
     srcSheet: 'From the operations sheet', srcOdoo: 'From Odoo directly: this day is not in the operations sheet yet', srcErr: 'Could not read the operations sheet, showing Odoo:',
     dows: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   },
@@ -32,6 +34,7 @@ const T = {
     hTitle: 'الوزن لكل مندوب ويوم', hSub: 'الكيلو المستلم كل يوم هذا الشهر · أيام الجمعة مظللة',
     none: 'لا توجد بيانات عمليات لهذا اليوم بعد.', noData: 'بيانات العمليات غير متاحة بعد، وستظهر بعد التحديث القادم.',
     notes: ['الطلبات تُحسب في يوم الاستلام المجدول. الطلب المؤجل ينتقل ليومه الجديد ويُحسب هناك.', 'الطلبات الملغاة وغير المجاب عليها تُحسب حتى لو أُرشفت لاحقاً في أودو.', 'هدف الليدز اليومي هو عمود "Daily Leads" في آخر نسخة من تبويب التوقعات للشهر.'],
+    kgPend: n => `لم يُدخل الوزن لـ ${n} استلام`, kgNote: 'الوزن يأتي فقط من عمود الوزن في شيت العمليات ويُدخله فريق اللوجستيات. – تعني لم يُدخل بعد، و* تعني أُدخل لجزء من الاستلامات فقط. كغ لكل استلام يُحسب من الاستلامات التي لها وزن فقط.',
     srcSheet: 'من شيت العمليات', srcOdoo: 'من أودو مباشرة: هذا اليوم لم يُكتب في شيت العمليات بعد', srcErr: 'تعذرت قراءة شيت العمليات، المعروض من أودو:',
     dows: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
   },
@@ -47,7 +50,7 @@ let lang = 'en', day = null, root = null, last = null, sheet = null, sheetAt = 0
 function merged(ds) {
   const od = ds.ops || { rows: [], drivers: {} }, S = new Set((sheet && sheet.days) || []);
   const rows = ((sheet && sheet.rows) || []).slice();
-  for (const r of od.rows || []) if (!S.has(r[0])) rows.push([r[0], (od.drivers || {})[r[1]] || String(r[1]), ...r.slice(2)]);
+  for (const r of od.rows || []) if (!S.has(r[0])) rows.push([r[0], (od.drivers || {})[r[1]] || String(r[1]), ...r.slice(2, 6), null]);   // weight only from the sheet
   const drivers = {}; for (const r of rows) drivers[r[1]] = r[1];
   return { ...ds, ops: { rows, drivers }, _sheetDays: S };
 }
@@ -71,13 +74,16 @@ const todayKSA = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 
 const fDay = iso => { const d = new Date(iso + 'T00:00:00Z'); return `${t('dows')[d.getUTCDay()]} ${new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA-u-nu-latn-ca-gregory' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d)}`; };
 const rateCls = r => (r == null ? '' : r >= 0.9 ? 'good' : r >= 0.8 ? 'warn' : 'bad');
 
-function blank() { return { orders: 0, rec: 0, can: 0, na: 0, post: 0, open: 0, kg: 0 }; }
+function blank() { return { orders: 0, rec: 0, can: 0, na: 0, post: 0, open: 0, kg: 0, recW: 0, kgMiss: 0 }; }
 function add(o, st, act, n, kg) {
   if (!act && st !== '4' && st !== '5') return;   // archived orders count only as cancelled / no answer
   o.orders += n;
-  if (st === '6') { o.rec += n; o.kg += kg; } else if (st === '5') o.can += n; else if (st === '4') o.na += n; else if (st === '3') o.post += n; else o.open += n;
+  if (st === '6') { o.rec += n; if (kg == null) o.kgMiss += n; else { o.kg += kg; o.recW += n; } } else if (st === '5') o.can += n; else if (st === '4') o.na += n; else if (st === '3') o.post += n; else o.open += n;
 }
 const closed = o => o.rec + o.can + o.na;
+// Weight is entered by the logistics team in the sheet: '–' = not entered yet, '*' = entered for part of the pickups only
+const kgf = o => (o.recW ? nf(o.kg) + (o.kgMiss ? '*' : '') : o.kgMiss ? '–' : nf(0));
+const kgp = o => (o.recW ? nf(o.kg / o.recW, 1) : '–');
 
 function compute(ds, d) {
   const m = d.slice(0, 7), mStart = m + '-01', op = ds.ops || {};
@@ -87,7 +93,7 @@ function compute(ds, d) {
     const cm = byCityM[city] || (byCityM[city] = blank()); add(cm, st, act, n, kg);
     const dm = byDrvM[drv] || (byDrvM[drv] = blank()); add(dm, st, act, n, kg);
     (drvCity[drv] || (drvCity[drv] = {}))[city] = ((drvCity[drv] || {})[city] || 0) + n;
-    if (st === '6' && act) { const h = heat[drv] || (heat[drv] = {}); h[date] = (h[date] || 0) + kg; }
+    if (st === '6' && act && kg != null) { const h = heat[drv] || (heat[drv] = {}); h[date] = (h[date] || 0) + kg; }
     if (date !== d) continue;
     add(byCity[city] || (byCity[city] = blank()), st, act, n, kg);
     add(byDrv[drv] || (byDrv[drv] = blank()), st, act, n, kg);
@@ -126,18 +132,18 @@ function html(ds, d) {
   if (!dayAll.orders && !monAll.orders) return head + `<div class="panel"><p class="muted">${esc(t('none'))}</p></div>`;
   const rate = div(dayAll.rec, closed(dayAll)), lp = div(lTot, tTot);
   const tiles = `<div class="op-tiles">
-    <div class="panel op-tile dk"><div class="k">${esc(t('tWeight'))}</div><div class="v">${nf(dayAll.kg)} <small>kg</small></div><div class="s">${esc(t('tMonth'))} ${nf(monAll.kg)} kg</div></div>
+    <div class="panel op-tile dk"><div class="k">${esc(t('tWeight'))}</div><div class="v">${kgf(dayAll)} <small>kg</small></div><div class="s">${esc(t('tMonth'))} ${kgf(monAll)} kg${dayAll.kgMiss ? ' · ' + esc(t('kgPend')(dayAll.kgMiss)) : ''}</div></div>
     <div class="panel op-tile"><div class="k">${esc(t('tOrders'))}</div><div class="v">${nf(dayAll.rec)}</div><div class="s">${esc(t('tOf'))} ${nf(dayAll.orders)} · ${esc(t('tMonth'))} ${nf(monAll.rec)}</div></div>
     <div class="panel op-tile"><div class="k">${esc(t('tRate'))}</div><div class="v"><span class="op-c ${rateCls(rate)}">${pf(rate)}</span></div><div class="s">${esc(t('tMonth'))} ${pf(div(monAll.rec, closed(monAll)))}</div></div>
     <div class="panel op-tile"><div class="k">${esc(t('tLeads'))}</div><div class="v">${nf(lTot)} <small>/ ${nf(tTot)}</small></div><div class="s"><span class="op-c ${lp == null ? '' : lp >= 1 ? 'good' : lp >= 0.9 ? 'warn' : 'bad'}">${pf(lp)}</span></div></div>
-    <div class="panel op-tile"><div class="k">${esc(t('tKgPick'))}</div><div class="v">${nf(div(dayAll.kg, dayAll.rec), 1)}</div><div class="s">${esc(t('tMonth'))} ${nf(div(monAll.kg, monAll.rec), 1)}</div></div>
+    <div class="panel op-tile"><div class="k">${esc(t('tKgPick'))}</div><div class="v">${kgp(dayAll)}</div><div class="s">${esc(t('tMonth'))} ${kgp(monAll)}</div></div>
     <div class="panel op-tile"><div class="k">${esc(t('tDrivers'))}</div><div class="v">${nf(drvOut)}</div><div class="s">${nf(div(dayAll.rec, drvOut), 1)} ${esc(lang === 'ar' ? 'استلام لكل مندوب' : 'pickups per driver')}</div></div></div>`;
   // weight by city
   const wcs = cs.filter(c => (C.byCityM[c] && C.byCityM[c].orders) || (C.byCity[c] && C.byCity[c].orders));
   const maxW = Math.max(1, ...wcs.map(c => (C.byCity[c] || blank()).kg));
   const weight = `<div class="panel op-card"><h3 class="ch">${esc(t('wTitle'))}</h3><p class="muted sm">${esc(t('wSub'))}</p><table class="lst op-t"><thead><tr><th>${esc(t('city'))}</th><th class="n">${esc(t('wDay'))}</th><th></th><th class="n">${esc(t('wMonth'))}</th></tr></thead><tbody>
-    ${wcs.map(c => { const a = C.byCity[c] || blank(), b = C.byCityM[c] || blank(); return `<tr><td>${esc(cityName(c))}</td><td class="n">${nf(a.kg)}</td><td class="op-barc"><i style="width:${a.kg / maxW * 100}%"></i></td><td class="n">${nf(b.kg)}</td></tr>`; }).join('')}
-    <tr class="tot"><td>${esc(t('total'))}</td><td class="n">${nf(dayAll.kg)}</td><td></td><td class="n">${nf(monAll.kg)}</td></tr></tbody></table></div>`;
+    ${wcs.map(c => { const a = C.byCity[c] || blank(), b = C.byCityM[c] || blank(); return `<tr><td>${esc(cityName(c))}</td><td class="n">${kgf(a)}</td><td class="op-barc"><i style="width:${a.kg / maxW * 100}%"></i></td><td class="n">${kgf(b)}</td></tr>`; }).join('')}
+    <tr class="tot"><td>${esc(t('total'))}</td><td class="n">${kgf(dayAll)}</td><td></td><td class="n">${kgf(monAll)}</td></tr></tbody></table></div>`;
   // receipt rate by city
   const receipt = `<div class="panel op-card"><h3 class="ch">${esc(t('rTitle'))}</h3><p class="muted sm">${esc(t('rSub'))}</p><div class="op-rates">
     ${wcs.map(c => { const a = C.byCity[c] || blank(), r = div(a.rec, closed(a)), rm = div((C.byCityM[c] || blank()).rec, closed(C.byCityM[c] || blank())); return `<div class="op-rate"><span class="lbl">${esc(cityName(c))}</span><span class="bar"><i class="${rateCls(r)}" style="width:${(r || 0) * 100}%"></i></span><b class="op-c ${rateCls(r)}">${pf(r)}</b><small class="muted">${esc(t('tMonth'))} ${pf(rm)}</small></div>`; }).join('')}
@@ -152,7 +158,7 @@ function html(ds, d) {
   const ids = Object.keys(C.byDrvM).filter(i => C.drivers[i] && C.byDrvM[i].orders > 0);
   const groups = {}; for (const i of ids) (groups[C.home(i)] || (groups[C.home(i)] = [])).push(i);
   const H = t('dCols');
-  const row = (name, a, mo, cls = '') => { const r = div(a.rec, closed(a)), rm = div(mo.rec, closed(mo)); return `<tr class="${cls}"><td class="op-dn" dir="auto">${esc(name)}</td><td class="n">${nf(a.orders)}</td><td class="n">${nf(a.rec)}</td><td class="n">${nf(a.can)}</td><td class="n">${nf(a.na)}</td><td class="n">${nf(a.post)}</td><td class="n"><span class="op-c ${rateCls(r)}">${pf(r)}</span></td><td class="n">${nf(a.kg)}</td><td class="n">${nf(div(a.kg, a.rec), 1)}</td><td class="n">${nf(mo.kg)}</td><td class="n">${pf(rm)}</td></tr>`; };
+  const row = (name, a, mo, cls = '') => { const r = div(a.rec, closed(a)), rm = div(mo.rec, closed(mo)); return `<tr class="${cls}"><td class="op-dn" dir="auto">${esc(name)}</td><td class="n">${nf(a.orders)}</td><td class="n">${nf(a.rec)}</td><td class="n">${nf(a.can)}</td><td class="n">${nf(a.na)}</td><td class="n">${nf(a.post)}</td><td class="n"><span class="op-c ${rateCls(r)}">${pf(r)}</span></td><td class="n">${kgf(a)}</td><td class="n">${kgp(a)}</td><td class="n">${kgf(mo)}</td><td class="n">${pf(rm)}</td></tr>`; };
   const drvRows = cities(groups).concat(groups.unknown ? ['unknown'] : []).map(c => {
     const list = groups[c].sort((a, b) => (C.byDrv[b] || blank()).kg - (C.byDrv[a] || blank()).kg);
     return `<tr class="grp"><td colspan="11">${esc(c === 'unknown' ? '–' : cityName(c))}</td></tr>${list.map(i => row(C.drivers[i], C.byDrv[i] || blank(), C.byDrvM[i])).join('')}${row(t('total') + ' · ' + (c === 'unknown' ? '–' : cityName(c)), sumOf(C.byDrv, list), sumOf(C.byDrvM, list), 'sub')}`;
@@ -165,7 +171,7 @@ function html(ds, d) {
   const heat = `<div class="sec-h"><h2>${esc(t('hTitle'))}</h2><p>${esc(t('hSub'))}</p></div><div class="panel"><div class="tbl-wrap"><table class="op-heat"><thead><tr><th></th>${mdays.map(x => `<th class="${dow(x) === 5 ? 'fri' : ''}${x === d ? ' sel' : ''}">${+x.slice(8)}</th>`).join('')}<th>${esc(t('total'))}</th></tr></thead><tbody>
     ${cities(groups).concat(groups.unknown ? ['unknown'] : []).map(c => groups[c].map(i => { const h = C.heat[i] || {}; return `<tr><th dir="auto">${esc(C.drivers[i])}</th>${mdays.map(x => { const v = h[x] || 0; return `<td class="${dow(x) === 5 ? 'fri' : ''}" style="${v ? `background:rgba(12,163,157,${(0.1 + 0.9 * v / maxH).toFixed(2)});color:${v / maxH > 0.55 ? '#fff' : 'var(--ink)'}` : ''}">${v ? nf(v) : ''}</td>`; }).join('')}<td class="tot">${nf(mdays.reduce((a, x) => a + (h[x] || 0), 0))}</td></tr>`; }).join('')).join('')}
     </tbody></table></div></div>`;
-  const notes = `<ul class="notes">${t('notes').map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  const notes = `<ul class="notes">${[t('kgNote'), ...t('notes')].map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
   return `${head}${tiles}<div class="op-grid">${weight}${receipt}${leads}</div>${drivers}${heat}${notes}`;
 }
 
