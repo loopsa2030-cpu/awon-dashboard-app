@@ -458,3 +458,16 @@ td .dl{white-space:nowrap}
 .op-heat td.tot{font-weight:600;color:var(--petrol);padding:4px 8px}
 @media (max-width:1100px){.op-tiles{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:760px){.op-tiles{grid-template-columns:1fr 1fr}.op-grid{grid-template-columns:1fr}.op-rate{grid-template-columns:90px 1fr 46px}.op-rate small{display:none}}
+
+/* partnership flow (four stages) */
+.pl-board{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:8px}
+.pl-col{margin:0;padding:12px 14px;border-top:4px solid var(--muted);border-radius:12px;min-height:120px}
+.pl-planning{border-top-color:var(--gold)}.pl-communication{border-top-color:var(--teal)}.pl-won{border-top-color:var(--petrol)}.pl-lost{border-top-color:var(--brick)}
+.pl-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.pl-h b{font-size:15px}
+.pl-n{background:var(--light);color:var(--petrol);border-radius:99px;padding:1px 10px;font-weight:600;font-size:13px}
+.pl-col ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pl-col li{border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:grid;gap:2px;overflow-wrap:anywhere}
+.pl-col li small{font-size:12.5px}
+@media (max-width:900px){.pl-board{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.pl-board{grid-template-columns:1fr}}

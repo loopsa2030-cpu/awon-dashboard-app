@@ -44,6 +44,7 @@ function clean(b) {
     partnerCpk: { pick: [1, 2, 3].includes(Number(b.partnerCpk && b.partnerCpk.pick)) ? Number(b.partnerCpk.pick) : 2, s: [0, 1, 2].map(i => num(b.partnerCpk && b.partnerCpk.s && b.partnerCpk.s[i])), band: num(b.partnerCpk && b.partnerCpk.band) },
     initiatives: list(b.initiatives, 60).map(i => ({ name: str(i.name), status: ['planned', 'active', 'paused', 'done'].includes(i.status) ? i.status : 'planned', start: str(i.start, 10), end: str(i.end, 10), sources: ids(i.sources), leads: num(i.leads) })),
     team: list(b.team, 20).map(m => ({ name: str(m.name), metric: str(m.metric, 40), dir: m.dir === 'down' ? 'down' : 'up', start: num(m.start), startDate: str(m.startDate, 10), days: num(m.days), source: str(m.source, 40), manual: Object.fromEntries(Object.entries(m.manual || {}).filter(([d, v]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && num(v) != null).map(([d, v]) => [d, num(v)])) })),
+    pipeline: Object.fromEntries(['planning', 'communication', 'won', 'lost'].map(st => [st, list(b.pipeline && b.pipeline[st], 150).map(c => ({ name: str(c && c.name).trim(), note: str(c && c.note, 200).trim() })).filter(c => c.name)])),
     updatedAt: new Date().toISOString(),
   };
 }

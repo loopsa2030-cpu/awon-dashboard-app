@@ -376,6 +376,11 @@ Object.assign(T.ar, {
   seAliasHint: 'اكتب الاسم واضغط Enter', seCityHint: 'اكتب المدينة واضغط Enter', seCosts: 'تكاليف أخرى (غير الإعلانات)', seCostAdd: 'إضافة تكلفة', seCostName: 'البند', seCostAmt: 'التكلفة هذا الشهر (دولار)',
   seChecks: 'قائمة الإطلاق', ckPage: 'صفحة الشريك ورسالة الإطلاق', ckPch: 'قنوات الشريك', ckAch: 'قنوات عون', seBand: 'النطاق (0.03 = ±3%)', seScen: n => `السيناريو ${n}`, sePick: 'السيناريو المختار',
 });
+const PL_STAGES = ['planning', 'communication', 'won', 'lost'];
+Object.assign(T.en, { plTitle: 'Partnership flow', plSub: 'Companies at each stage. Nouf keeps the lists up to date in Settings.', pl_planning: 'Planning', pl_communication: 'Communication', pl_won: 'Won', pl_lost: 'Lost',
+  plEmpty: 'No companies yet', plEdit: 'Edit in Settings', plSet: 'Partnership flow (companies by stage)', plSetSub: 'Add each company under its stage. Use "Stage" to move it when it progresses.', plCompany: 'Company', plNote: 'Note (optional)', plStage: 'Stage', plAdd: 'Add company', plCount: n => `${n} ${n === 1 ? 'company' : 'companies'}` });
+Object.assign(T.ar, { plTitle: 'مسار الشراكات', plSub: 'الشركات في كل مرحلة. نوف تحدّث القوائم من الإعدادات.', pl_planning: 'التخطيط', pl_communication: 'التواصل', pl_won: 'تم الاتفاق', pl_lost: 'لم يتم الاتفاق',
+  plEmpty: 'لا توجد شركات بعد', plEdit: 'تعديل من الإعدادات', plSet: 'مسار الشراكات (الشركات حسب المرحلة)', plSetSub: 'أضف كل شركة تحت مرحلتها، واستخدم «المرحلة» لنقلها عند تقدّمها.', plCompany: 'الشركة', plNote: 'ملاحظة (اختياري)', plStage: 'المرحلة', plAdd: 'إضافة شركة', plCount: n => `${n} ${n === 1 ? 'شركة' : 'شركات'}` });
 const PB_CITIES = ['jeddah', 'riyadh', 'eastern', 'madina', 'asir', 'taif', 'mecca', 'qassim'];
 const PB_PLATS = ['tiktok', 'snapchat', 'meta'];
 const CITY_LBL = { en: { jeddah: 'Jeddah', riyadh: 'Riyadh', eastern: 'Eastern', madina: 'Madina', asir: 'Asir', taif: 'Taif', mecca: 'Mecca', qassim: 'Qassim' },
@@ -456,10 +461,17 @@ function cpkAction(cpk) {
   if (cpk == null || !tg) return null;
   return cpk < tg * (1 - band) ? ['good', t('ptRaise')] : cpk > tg * (1 + band) ? ['bad', t('ptStop')] : ['warn', t('ptKeep')];
 }
+function pipelineBoard() {
+  const P = settings.pipeline || {};
+  const col = st => { const L = (P[st] || []).filter(c => c && String(c.name || '').trim());
+    return `<div class="panel pl-col pl-${st}"><div class="pl-h"><b>${esc(t('pl_' + st))}</b><span class="pl-n">${num(fN(L.length))}</span></div>
+      ${L.length ? `<ul>${L.map(c => `<li><span dir="auto">${esc(c.name)}</span>${c.note ? `<small class="muted" dir="auto">${esc(c.note)}</small>` : ''}</li>`).join('')}</ul>` : `<p class="muted sm">${esc(t('plEmpty'))}</p>`}</div>`; };
+  return `<div class="sec-h"><h2>${esc(t('plTitle'))}</h2><p>${esc(t('plSub'))} <a href="#set" data-goset>${esc(t('plEdit'))}</a></p></div><div class="pl-board">${PL_STAGES.map(col).join('')}</div>`;
+}
 function partnersTab(ds, from, to) {
   const R = ptData(ds, from, to), PT = settings.partnerTargets || {}, f = ptPace(to), CL = CITY_LBL[lang];
   const head = `<div class="sec-h"><h2>${esc(t('ptTitle'))}</h2><p>${esc(fDate(from))} – ${esc(fDate(to))} · ${esc(t('ptSub'))}</p></div>`;
-  if (!R.length) return `${head}<div class="panel"><p class="muted">${esc(t('ptNone'))}</p><a href="#set" class="chip" data-goset>${esc(t('ptGo'))}</a></div>`;
+  if (!R.length) return `${head}${pipelineBoard()}<div class="panel"><p class="muted">${esc(t('ptNone'))}</p><a href="#set" class="chip" data-goset>${esc(t('ptGo'))}</a></div>`;
   const tot = k => R.reduce((a, r) => a + (r[k] || 0), 0);
   const total = tot('total'), direct = tot('valid'), uplift = tot('uplift'), kg = tot('kg'), paid = tot('paid'), other = tot('nonPaid'), spend = paid + other;
   const target = PT.leads || R.reduce((a, r) => a + (r.tLeads || 0), 0) || null, kgT = PT.kg || R.reduce((a, r) => a + (r.tKg || 0), 0) || null;
@@ -508,7 +520,15 @@ function partnersTab(ds, from, to) {
     ${[['rdSrc', 'rdAuto', r => (r.p.sources || []).length > 0], ['rdAds', 'rdAuto', r => r.adList.length > 0], ['rdPage', 'rdManual', r => r.p.checks && r.p.checks.page], ['rdPch', 'rdManual', r => r.p.checks && r.p.checks.partnerCh], ['rdAch', 'rdManual', r => r.p.checks && r.p.checks.awonCh]]
       .map(([k, h, fn]) => `<tr><td>${esc(t(k))}</td><td class="muted sm">${esc(t(h))}</td>${R.map(r => `<td>${ck(fn(r))}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
   const notes = `<ul class="notes">${t('ptNotes').map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
-  return `${head}${hero}${cards}${adTable}${bench}${ready}${notes}`;
+  return `${head}${hero}${pipelineBoard()}${cards}${adTable}${bench}${ready}${notes}`;
+}
+function pipelineSettingsHTML() {
+  const P = settings.pipeline;
+  return `<section class="panel se-card"><h3 class="ch">${esc(t('plSet'))}</h3><p class="muted sm">${esc(t('plSetSub'))}</p>
+    ${PL_STAGES.map(st => `<div class="se-sub"><b>${esc(t('pl_' + st))} · ${esc(t('plCount')((P[st] || []).length))}</b>
+      ${(P[st] || []).map((c, i) => `<div class="se-grid">${fld(t('plCompany'), inp(`pipeline.${st}.${i}.name`, c.name))}${fld(t('plNote'), inp(`pipeline.${st}.${i}.note`, c.note))}
+        ${fld(t('plStage'), `<select data-plmove="${st}.${i}">${PL_STAGES.map(x => `<option value="${x}" ${x === st ? 'selected' : ''}>${esc(t('pl_' + x))}</option>`).join('')}</select>`)}<button class="chip" data-pldel="${st}.${i}">${esc(t('remove'))}</button></div>`).join('')}
+      <button class="chip" data-pladd="${st}">+ ${esc(t('plAdd'))}</button></div>`).join('')}</section>`;
 }
 function partnerSettingsHTML(ds) {
   const B = settings.partnerBench, Cp = settings.partnerCpk, CL = CITY_LBL[lang];
@@ -551,6 +571,8 @@ function settingsHTML(ds) {
   <div class="sec-h"><h2>${esc(t('seTitle'))}</h2><p>${esc(t('seSub'))}</p></div>
   ${persistent ? '' : `<div class="err warnbar">${esc(t('seDemo'))}</div>`}
   <div class="se-bar"><button class="chip" aria-pressed="true" id="seSave">${esc(t('seSave'))}</button><span id="seStatus" class="muted">${esc(status || (dirty ? t('seUnsaved') : ''))}</span></div>
+
+  ${pipelineSettingsHTML()}
 
   <section class="panel se-card"><h3 class="ch">${esc(t('seMonth'))}</h3><div class="se-grid">
     ${fld(t('seMonthSel'), `<select data-month>${months.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${x}</option>`).join('')}</select>`)}
@@ -602,6 +624,7 @@ function wireSettings(root) {
     const el = e.target;
     if (el.dataset && el.dataset.month != null) { settings._month = el.value; renderSettings(); }
     if (el.dataset && el.dataset.add != null) addChip(el);
+    if (el.dataset && el.dataset.plmove) { const [st, i] = el.dataset.plmove.split('.'), to = el.value; if (to !== st && settings.pipeline[to]) { const [c] = settings.pipeline[st].splice(+i, 1); settings.pipeline[to].push(c); mark(); renderSettings(); } }
   });
   root.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.add != null) { e.preventDefault(); addChip(e.target); } });
   root.addEventListener('click', e => {
@@ -609,6 +632,8 @@ function wireSettings(root) {
     if (b.dataset.rm != null) { const box = b.closest('.chips'), arr = getPath(settings, box.dataset.path) || [], v = b.dataset.rm; setPath(settings, box.dataset.path, arr.filter(x => String(x) !== v)); mark(); renderSettings(); }
     else if (b.dataset.del) { const [k, i] = b.dataset.del.split('.'); settings[k].splice(+i, 1); mark(); renderSettings(); }
     else if (b.dataset.new) { settings[b.dataset.new].push(b.dataset.new === 'partners' ? { name: '', sources: [], start: '', end: '', leads: null, kg: null, cities: [], aliases: [], costs: [], checks: {} } : { name: '', status: 'planned', start: '', end: '', sources: [], leads: null }); mark(); renderSettings(); }
+    else if (b.dataset.pladd) { settings.pipeline[b.dataset.pladd].push({ name: '', note: '' }); mark(); renderSettings(); const L = root.querySelectorAll(`[data-path^="pipeline.${b.dataset.pladd}."][data-path$=".name"]`); if (L.length) L[L.length - 1].focus(); }
+    else if (b.dataset.pldel) { const [st, i] = b.dataset.pldel.split('.'); settings.pipeline[st].splice(+i, 1); mark(); renderSettings(); }
     else if (b.dataset.newsvc) { const m = b.dataset.newsvc; settings.months[m] = settings.months[m] || {}; settings.months[m].services = settings.months[m].services || { budget: null, items: [] }; settings.months[m].services.items = settings.months[m].services.items || []; settings.months[m].services.items.push({ name: '', cost: null }); mark(); renderSettings(); }
     else if (b.dataset.newcost != null) { const p = settings.partners[+b.dataset.newcost]; p.costs = p.costs || []; p.costs.push({ name: '', cost: null }); mark(); renderSettings(); }
     else if (b.dataset.delcost) { const [i, j] = b.dataset.delcost.split('.'); settings.partners[+i].costs.splice(+j, 1); mark(); renderSettings(); }
@@ -653,6 +678,7 @@ async function loadSettings() {
   if (settings.partnerCpk.band == null) settings.partnerCpk.band = d.partnerCpk.band;
   settings.partners = (settings.partners || []).map(p => ({ cities: [], aliases: [], costs: [], checks: {}, end: '', ...p }));
   if (!settings.team || !settings.team.length) settings.team = d.team;
+  const pl = (s && s.pipeline) || {}; settings.pipeline = Object.fromEntries(PL_STAGES.map(st => [st, Array.isArray(pl[st]) ? pl[st].map(c => ({ name: '', note: '', ...c })) : []]));
   saved = JSON.stringify(settings);
 }
 function box(id, html) { const el = $('#' + id); if (el) el.innerHTML = html; }
