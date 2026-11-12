@@ -471,3 +471,8 @@ td .dl{white-space:nowrap}
 .pl-col li small{font-size:12.5px}
 @media (max-width:900px){.pl-board{grid-template-columns:1fr 1fr}}
 @media (max-width:480px){.pl-board{grid-template-columns:1fr}}
+
+/* operations: period summary above the day view */
+.op-period{margin-bottom:6px}
+.op-dayh{display:flex;align-items:baseline;gap:10px;margin:26px 0 -4px;padding-top:14px;border-top:1px solid var(--line)}
+.op-dayh span{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}

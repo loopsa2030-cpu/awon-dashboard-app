@@ -18,6 +18,7 @@ const T = {
     hTitle: 'Weight by driver and day', hSub: 'kg received each day this month · Fridays shaded',
     none: 'No operations data for this day yet.', noData: 'Operations data is not available yet. It appears after the next data refresh.',
     notes: ['Orders are counted on their scheduled pickup day. A postponed order moves to its new day, so it is counted there.', 'Cancelled and no-answer orders count even when later archived in Odoo.', 'The daily lead target is the "Daily Leads" column of the month\'s latest forecast tab.'],
+    pTitle: 'Selected period', pSub: 'Totals for the dates picked in the filter at the top', pDays: n => `${n} pickup ${n === 1 ? 'day' : 'days'}`, pDrivers: 'Active drivers', pPerDay: 'pickups per day', pClip: d => `Operations data starts on ${d}`, pNone: 'No operations data in the selected dates.', dayTitle: 'Day view', dayHint: 'Pick a day inside the selected dates',
     kgPend: n => `weight not entered for ${n} pickups`, kgNote: 'Weight comes only from the Weight column of the operations sheet, entered by the logistics team. – means not entered yet; * means entered for part of the pickups only. kg per pickup uses only pickups that have a weight.',
     srcSheet: 'From the operations sheet', srcOdoo: 'From Odoo directly: this day is not in the operations sheet yet', srcErr: 'Could not read the operations sheet, showing Odoo:',
     dows: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
@@ -34,6 +35,7 @@ const T = {
     hTitle: 'الوزن لكل مندوب ويوم', hSub: 'الكيلو المستلم كل يوم هذا الشهر · أيام الجمعة مظللة',
     none: 'لا توجد بيانات عمليات لهذا اليوم بعد.', noData: 'بيانات العمليات غير متاحة بعد، وستظهر بعد التحديث القادم.',
     notes: ['الطلبات تُحسب في يوم الاستلام المجدول. الطلب المؤجل ينتقل ليومه الجديد ويُحسب هناك.', 'الطلبات الملغاة وغير المجاب عليها تُحسب حتى لو أُرشفت لاحقاً في أودو.', 'هدف الليدز اليومي هو عمود "Daily Leads" في آخر نسخة من تبويب التوقعات للشهر.'],
+    pTitle: 'الفترة المحددة', pSub: 'إجماليات التواريخ المختارة في الفلتر أعلى الصفحة', pDays: n => `${n} يوم استلام`, pDrivers: 'المناديب العاملون', pPerDay: 'استلام في اليوم', pClip: d => `بيانات العمليات تبدأ من ${d}`, pNone: 'لا توجد بيانات عمليات في التواريخ المحددة.', dayTitle: 'عرض اليوم', dayHint: 'اختر يوماً داخل التواريخ المحددة',
     kgPend: n => `لم يُدخل الوزن لـ ${n} استلام`, kgNote: 'الوزن يأتي فقط من عمود الوزن في شيت العمليات ويُدخله فريق اللوجستيات. – تعني لم يُدخل بعد، و* تعني أُدخل لجزء من الاستلامات فقط. كغ لكل استلام يُحسب من الاستلامات التي لها وزن فقط.',
     srcSheet: 'من شيت العمليات', srcOdoo: 'من أودو مباشرة: هذا اليوم لم يُكتب في شيت العمليات بعد', srcErr: 'تعذرت قراءة شيت العمليات، المعروض من أودو:',
     dows: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
@@ -113,6 +115,33 @@ function compute(ds, d) {
 const cities = (...objs) => { const s = new Set(); for (const o of objs) for (const k of Object.keys(o)) if (k !== 'unknown') s.add(k); return [...s].sort((a, b) => (ORDER.indexOf(a) + 1 || 99) - (ORDER.indexOf(b) + 1 || 99)); };
 const sumOf = (obj, keys) => keys.reduce((o, k) => { const x = obj[k]; if (x) for (const f in o) o[f] += x[f]; return o; }, blank());
 
+function monthTargets(ds, m) {
+  const fc = ds.months && ds.months[m] && ds.months[m].forecast, days = (fc && fc.daysInMonth) || dim(m), target = {};
+  for (const c of (fc && fc.cities) || []) target[c.city] = c.dailyLeads ? c.dailyLeads * days : c.totalLeads || (((c.paid && c.paid.leads) || 0) + ((c.organic && c.organic.leads) || 0) + ((c.wa && c.wa.leads) || 0));
+  return { target, days };
+}
+const fRange = (a, b) => { const f = iso => new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA-u-nu-latn-ca-gregory' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T00:00:00Z')); return a === b ? f(a) : `${f(a)} – ${f(b)}`; };
+// Totals for the date filter at the top (clipped to yesterday and to the first day with operations data)
+function period(ds, from, to) {
+  const rows = (ds.ops && ds.ops.rows) || [], y = addD(todayKSA(), -1), first = rows.reduce((m, r) => (r[0] < m ? r[0] : m), '9999');
+  const a = from < first ? first : from, b = to > y ? y : to;
+  const head = `<div class="sec-h"><h2>${esc(t('pTitle'))} · ${esc(fRange(from, to > y ? y : to))}</h2><p>${esc(t('pSub'))}${from < first && first !== '9999' ? ' · ' + esc(t('pClip')(fRange(first, first))) : ''}</p></div>`;
+  if (a > b) return head + `<div class="panel"><p class="muted">${esc(t('pNone'))}</p></div>`;
+  const tot = blank(), drv = new Set(), pdays = new Set();
+  for (const [date, d, , st, act, n, kg] of rows) { if (date < a || date > b) continue; add(tot, st, act, n, kg); if (act || st === '4' || st === '5') drv.add(d); if (st === '6' && act) pdays.add(date); }
+  if (!tot.orders) return head + `<div class="panel"><p class="muted">${esc(t('pNone'))}</p></div>`;
+  let leads = 0, tg = 0, hasT = false; const TM = {};
+  for (const [date, , , , , n] of (ds.odoo && ds.odoo.rows) || []) if (date >= a && date <= b) leads += n;
+  for (let x = a; x <= b; x = addD(x, 1)) { const m = x.slice(0, 7), M = TM[m] || (TM[m] = monthTargets(ds, m)); const v = Object.values(M.target).reduce((s, q) => s + (q || 0), 0); if (v) { hasT = true; tg += v / M.days; } }
+  const rate = div(tot.rec, closed(tot)), lp = hasT ? div(leads, tg) : null, nd = pdays.size;
+  return head + `<div class="op-tiles op-period">
+    <div class="panel op-tile dk"><div class="k">${esc(t('tWeight'))}</div><div class="v">${kgf(tot)} <small>kg</small></div><div class="s">${tot.kgMiss ? esc(t('kgPend')(tot.kgMiss)) : esc(t('pDays')(nd))}</div></div>
+    <div class="panel op-tile"><div class="k">${esc(t('tOrders'))}</div><div class="v">${nf(tot.rec)}</div><div class="s">${esc(t('tOf'))} ${nf(tot.orders)} · ${nf(div(tot.rec, nd))} ${esc(t('pPerDay'))}</div></div>
+    <div class="panel op-tile"><div class="k">${esc(t('tRate'))}</div><div class="v"><span class="op-c ${rateCls(rate)}">${pf(rate)}</span></div><div class="s">${nf(tot.can)} ${esc(lang === 'ar' ? 'ملغي' : 'cancelled')} · ${nf(tot.na)} ${esc(lang === 'ar' ? 'لا يرد' : 'no answer')}</div></div>
+    <div class="panel op-tile"><div class="k">${esc(t('tLeads'))}</div><div class="v">${nf(leads)} <small>/ ${hasT ? nf(tg) : '–'}</small></div><div class="s"><span class="op-c ${lp == null ? '' : lp >= 1 ? 'good' : lp >= 0.9 ? 'warn' : 'bad'}">${pf(lp)}</span></div></div>
+    <div class="panel op-tile"><div class="k">${esc(t('tKgPick'))}</div><div class="v">${kgp(tot)}</div><div class="s">${esc(t('pDays')(nd))}</div></div>
+    <div class="panel op-tile"><div class="k">${esc(t('pDrivers'))}</div><div class="v">${nf(drv.size)}</div><div class="s">${nf(div(tot.rec, drv.size * nd), 1)} ${esc(lang === 'ar' ? 'استلام لكل مندوب في اليوم' : 'pickups per driver per day')}</div></div></div>`;
+}
 function latestDay(ds, to) {
   const y = addD(todayKSA(), -1); let d = to && to < y ? to : y;
   const rows = (ds.ops && ds.ops.rows) || [];
@@ -128,7 +157,7 @@ function html(ds, d) {
   const drvOut = Object.values(C.byDrv).filter(o => o.orders > 0).length;
   const src = ds._sheetDays && ds._sheetDays.has(d) ? `<span class="dchip good">${esc(t('srcSheet'))}</span>` : `<span class="dchip warn">${esc(sheet && sheet.mode === 'error' ? t('srcErr') + ' ' + sheet.error : t('srcOdoo'))}</span>`;
   const head = `<div class="op-head"><div class="sec-h"><h2>${esc(t('title'))} · ${esc(fDay(d))}</h2><p>${esc(t('sub'))} ${sheet ? src : ''}</p></div>
-    <div class="op-nav"><button class="chip" data-opday="-1" aria-label="${esc(t('prev'))}">${lang === 'ar' ? '→' : '←'}</button><button class="chip" data-opday="0">${esc(t('today'))}</button><button class="chip" data-opday="1" aria-label="${esc(t('next'))}" ${d >= addD(todayKSA(), -1) ? 'disabled' : ''}>${lang === 'ar' ? '←' : '→'}</button></div></div>`;
+    <div class="op-nav"><button class="chip" data-opday="-1" aria-label="${esc(t('prev'))}" ${last && d <= last.from ? 'disabled' : ''}>${lang === 'ar' ? '→' : '←'}</button><button class="chip" data-opday="0">${esc(t('today'))}</button><button class="chip" data-opday="1" aria-label="${esc(t('next'))}" ${d >= addD(todayKSA(), -1) || (last && d >= last.to) ? 'disabled' : ''}>${lang === 'ar' ? '←' : '→'}</button></div></div>`;
   if (!dayAll.orders && !monAll.orders) return head + `<div class="panel"><p class="muted">${esc(t('none'))}</p></div>`;
   const rate = div(dayAll.rec, closed(dayAll)), lp = div(lTot, tTot);
   const tiles = `<div class="op-tiles">
@@ -180,18 +209,19 @@ function draw() {
   const ds = merged(last.ds);
   if (!ds.ops.rows.length) { root.innerHTML = `<section class="kpi-sec"><div class="panel"><p class="muted">${esc(t('noData'))}</p></div></section>`; return; }
   if (!day) day = latestDay(ds, last.to);
-  try { root.innerHTML = `<section class="kpi-sec op">${html(ds, day)}</section>`; }
+  if (last.from && day < last.from) day = last.from;
+  try { root.innerHTML = `<section class="kpi-sec op">${period(ds, last.from || day, last.to || day)}<div class="op-dayh"><span>${esc(t('dayTitle'))}</span><small class="muted">${esc(t('dayHint'))}</small></div>${html(ds, day)}</section>`; }
   catch (e) { console.error(e); root.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 function render(c) {
   lang = c.lang === 'ar' ? 'ar' : 'en'; root = document.getElementById(c.el || 'opsRoot');
-  if (!last || last.to !== c.to) day = null;   // a new date filter resets the day to its latest complete day
+  if (!last || last.to !== c.to || last.from !== c.from) day = null;   // a new date filter resets the day to the latest complete day inside it
   last = c;
   if (root && !root._wired) {
     root.addEventListener('click', e => {
       const b = e.target.closest('[data-opday]'); if (!b || b.disabled) return;
       const s = +b.dataset.opday; day = s === 0 ? latestDay(merged(last.ds), last.to) : addD(day, s);
-      const y = addD(todayKSA(), -1); if (day > y) day = y;
+      const y = addD(todayKSA(), -1); if (day > y) day = y; if (last.to && day > last.to) day = last.to; if (last.from && day < last.from) day = last.from;
       draw();
     });
     root._wired = true;

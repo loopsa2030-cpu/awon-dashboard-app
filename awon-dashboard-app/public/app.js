@@ -732,8 +732,8 @@ function renderKpi() {
 }
 function renderOps() {
   if (!window.AwonOps || !dataset || $('#view-ops').hidden) return;
-  const { to } = resolve(state);
-  AwonOps.render({ ds: dataset, to, lang, el: 'opsRoot' });
+  const { from, to } = resolve(state);
+  AwonOps.render({ ds: dataset, from, to, lang, el: 'opsRoot' });
 }
 function renderMkt() {
   if (!window.AwonMkt || $('#view-mkt').hidden) return;
