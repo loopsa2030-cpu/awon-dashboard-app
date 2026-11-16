@@ -14,6 +14,8 @@ const T = {
     spTitle: 'Spend and spend quality', spSub: 'How much we should spend, how much we spent, and what each dollar brings back',
     budgetTitle: 'Budget against spend', budget: 'Full marketing budget', spent: 'Spent so far', spentPct: 'of budget', left: 'Left', should: 'Should have spent by today', pace: 'Spend pace',
     paceFast: 'Faster than plan', paceSlow: 'Slower than plan', paceOk: 'On plan', noBudget: 'No budget entered for this month yet. Add it in Settings.', setLink: 'Open settings',
+    eqMkt: 'Marketing spend', eqOh: 'Overhead', eqTot: 'Total spend', eqTotSub: 'Used for the Total row and the headline above', eqOhNone: 'None entered for these dates (Settings)',
+    eqGap: (a, b, more) => `Platform rows below use each platform's own spend plus WhatsApp: ${a}, which is ${b} ${more ? 'more' : 'less'} than the marketing spend because the Daily tab splits ad spend by city (Qassim is filled by hand and campaigns without a city are left out).`,
     mxTitle: 'Spend quality by platform', mxSub: 'For the selected dates. Green is better than the reference, red is worse, grey has no reference.',
     mainKpi: 'Kilograms per $1,000', mainNote: 'The main number: we are a weight business, not a leads business.', ref: 'Reference',
     openTitle: 'Open orders', openOf: n => `Valid leads in the period: ${n}. Open = leads not yet received.`, withOv: 'With overheads', totalOv: 'Total with overheads', bkPaid: 'Paid ads', bkBrand: 'Branding', ofBudget: 'of', g_tools: 'Tools and subscriptions', g_ugc: 'UGC / IGC', g_production: 'Production', g_services: 'Outsourced services',
@@ -52,6 +54,8 @@ const T = {
     spTitle: 'الصرف وجودته', spSub: 'كم لازم نصرف، كم صرفنا، وكم يرجع لنا كل دولار',
     budgetTitle: 'الميزانية مقابل الصرف', budget: 'ميزانية التسويق الكاملة', spent: 'صرفنا حتى اليوم', spentPct: 'من الميزانية', left: 'المتبقي', should: 'المفروض نكون صرفنا اليوم', pace: 'وتيرة الصرف',
     paceFast: 'أسرع من الخطة', paceSlow: 'أبطأ من الخطة', paceOk: 'على الخطة', noBudget: 'لم تُدخل ميزانية لهذا الشهر بعد. أضفها من الإعدادات.', setLink: 'فتح الإعدادات',
+    eqMkt: 'صرف التسويق', eqOh: 'التكاليف الأخرى', eqTot: 'إجمالي الصرف', eqTotSub: 'يُستخدم في صف الإجمالي والمؤشر الرئيسي أعلاه', eqOhNone: 'لا توجد مبالغ مُدخلة لهذه التواريخ (الإعدادات)',
+    eqGap: (a, b, more) => `صفوف المنصات أدناه تستخدم صرف كل منصة كما تسجله مع الواتساب: ${a}، أي ${more ? 'أكثر' : 'أقل'} بـ ${b} من صرف التسويق لأن التبويب اليومي يقسم صرف الإعلانات حسب المدينة (القصيم يُعبأ يدوياً والحملات بلا مدينة لا تُحسب).`,
     mxTitle: 'جودة الصرف لكل منصة', mxSub: 'للفترة المحددة. الأخضر أفضل من المرجع، والأحمر أسوأ، والرمادي بلا مرجع.',
     mainKpi: 'كيلو لكل 1,000 دولار', mainNote: 'الرقم الرئيسي: نحن في بزنس أوزان، مو بزنس ليدز.', ref: 'المرجع',
     openTitle: 'الطلبات المفتوحة', openOf: n => `الليدز الصالحة في الفترة: ${n}. المفتوح = ليدز لم تُستلم بعد.`, withOv: 'مع التكاليف الأخرى', totalOv: 'الإجمالي مع التكاليف الأخرى', bkPaid: 'الإعلانات المدفوعة', bkBrand: 'البراندنج', ofBudget: 'من', g_tools: 'الأدوات والاشتراكات', g_ugc: 'UGC / IGC', g_production: 'الإنتاج', g_services: 'الخدمات الخارجية',
@@ -143,6 +147,12 @@ function waSpend(ds, from, to) {
   for (const m of Object.values(ds.months || {})) for (const r of m.rows || []) if (r[0] >= from && r[0] <= to) tot += r[7] || 0;
   return tot;
 }
+// Marketing spend as on the Performance tab: the Daily tab's Paid + Organic (branding) + WhatsApp spend
+function mktSpend(ds, from, to) {
+  const o = { paid: 0, brand: 0, wa: 0 };
+  for (const m of Object.values(ds.months || {})) for (const r of m.rows || []) if (r[0] >= from && r[0] <= to) { o.paid += r[3] || 0; o.brand += r[5] || 0; o.wa += r[7] || 0; }
+  o.total = o.paid + o.brand + o.wa; return o;
+}
 // Tools, UGC/IGC, production and outsourced services: entered per month, spread evenly over the days of that month
 const OH = ['tools', 'ugc', 'production', 'services'];
 const monthGroup = (s, g) => (g === 'services' ? { budget: s.services && s.services.budget, spend: ((s.services && s.services.items) || []).reduce((a, i) => a + (Number(i.cost) || 0), 0) } : { budget: s[g] && s[g].budget, spend: s[g] && s[g].spend });
@@ -169,9 +179,10 @@ function groupData(ds, from, to) {
   for (const c of noRes) grp[c.plat].nr += c.spend;
   const tot = init(); for (const g of Object.values(grp)) for (const k of Object.keys(tot)) tot[k] += g[k];
   grp.total = tot;
-  const oh = overhead(from, to);
-  tot.spend += oh.total;   // Total = platforms + WhatsApp + overheads
-  return { grp, noRes, S, oh };
+  const oh = overhead(from, to), mk = mktSpend(ds, from, to);
+  tot.platSpend = tot.spend;                 // ad platforms + WhatsApp, as the rows above add up
+  tot.spend = mk.total + oh.total;           // Total = marketing spend (Daily tab, as on Performance) + overhead
+  return { grp, noRes, S, oh, mk };
 }
 const metricsOf = g => ({
   kgPer1000: g.spend > 0 ? div(g.kg, g.spend / 1000) : null, leadsPer1000: g.spend > 0 ? div(g.leads, g.spend / 1000) : null,
@@ -183,7 +194,8 @@ function cls(v, ref, dir) { if (v == null || ref == null) return 'na'; return (d
 // ---------------- rendering: spend ----------------
 function budgetCard(ds, to) {
   const m = to.slice(0, 7), s = settings.months[m] || {}, ms = m + '-01';
-  const adAll = Object.values(adSpend(ds, ms, to)), paid = adAll.filter(c => c.lg).reduce((a, c) => a + c.spend, 0), brand = adAll.filter(c => !c.lg).reduce((a, c) => a + c.spend, 0), ads = paid + brand, wa = waSpend(ds, ms, to), oh = overhead(ms, to);
+  // Same spend as the Performance tab: the Daily tab's Paid, Branding (Organic) and WhatsApp spend, plus overhead from Settings
+  const mk = mktSpend(ds, ms, to), paid = mk.paid, brand = mk.brand, ads = paid + brand, wa = mk.wa, oh = overhead(ms, to);
   // Paid, branding and WhatsApp budgets: the Settings value when entered, otherwise the month's forecast tab
   const fcCities = (ds.months && ds.months[m] && ds.months[m].forecast && ds.months[m].forecast.cities) || [];
   const fcB = k => fcCities.reduce((a, c) => a + ((c[k] && c[k].budget) || 0), 0) || null;
@@ -203,7 +215,7 @@ function budgetCard(ds, to) {
     <div class="sp-row"><span>${esc(t('budget'))} ${num(fUSD(budget))}</span><span>${esc(t('should'))} ${num(fUSD(should))}</span><span>${esc(t('left'))} ${num(fUSD(budget - spent))}</span></div>${rows}</div>`;
 }
 function matrix(ds, from, to) {
-  const { grp, noRes } = groupData(ds, from, to), R = settings.refs, by = R.leadsPer1000By || {};
+  const { grp, noRes, oh, mk } = groupData(ds, from, to), R = settings.refs, by = R.leadsPer1000By || {};
   const refOf = (key, p) => key === 'leadsPer1000' ? (p === 'total' ? R.leadsPer1000 : by[p] ?? null) : key === 'pickupRate' ? (R.pickupRate == null ? null : R.pickupRate / 100) : R[key] ?? null;
   const cols = [['kgPer1000', 'kgk', 'up', v => fN(v, 0)], ['leadsPer1000', 'ldk', 'up', v => fN(v, 0)], ['cpl', 'cpl', 'down', v => fUSD(v, 2)], ['cpk', 'cpk', 'down', v => fUSD(v, 3)], ['pickupRate', 'pr', 'up', fP], ['kgPerOrder', 'kgo', 'up', v => fN(v, 1)], ['nr', 'nr', 'down', v => fUSD(v, 0)]];
   const mx = p => { const g = grp[p], m = metricsOf(g); m.nr = p === 'other' || p === 'wa' || p === 'meta' || p === 'totalOv' ? null : g.nr; return m; };
@@ -229,7 +241,14 @@ function matrix(ds, from, to) {
       <div class="tbl-wrap"><table class="lst"><tr><th>${esc(t('nrCamp'))}</th><th>${esc(t('nrPlat'))}</th><th>${esc(t('nrSpend'))}</th><th>${esc(t('nrDays'))}</th></tr>${noRes.map(c => `<tr><td dir="auto">${esc(c.name)}</td><td>${esc(t(c.plat))}</td><td>${num(fUSD(c.spend, 0))}</td><td>${num(c.days.size)}</td></tr>`).join('')}</table></div>
       <p class="muted sm pad">${esc(t('nrProxy'))}</p></details>`
     : `<div class="panel nr"><p class="muted pad">${esc(t('nrNone'))}</p></div>`;
-  return `${main}<div class="panel"><div class="tbl-wrap"><table class="mx">${head}${[...PLATS.map(row), row('total'), row('other')].join('')}</table></div></div>${nr}
+  const rowsSum = PLATS.reduce((a, p) => a + grp[p].spend, 0), gap = rowsSum - mk.total;
+  const ohBits = ['tools', 'ugc', 'production', 'services'].filter(g => oh[g] > 0).map(g => `${t('g_' + g)} ${fUSD(oh[g])}`).join(' · ');
+  const eq = `<div class="panel sp-eq"><div class="sp-eq-row">
+      <div><span class="k">${esc(t('eqMkt'))}</span><b>${num(fUSD(mk.total))}</b><small>${esc(t('bkPaid'))} ${num(fUSD(mk.paid))} · ${esc(t('bkBrand'))} ${num(fUSD(mk.brand))} · ${esc(t('wa'))} ${num(fUSD(mk.wa))}</small></div>
+      <i>+</i><div><span class="k">${esc(t('eqOh'))}</span><b>${num(fUSD(oh.total))}</b><small>${esc(ohBits || t('eqOhNone'))}</small></div>
+      <i>=</i><div class="tot"><span class="k">${esc(t('eqTot'))}</span><b>${num(fUSD(tg.spend))}</b><small>${esc(t('eqTotSub'))}</small></div></div>
+    <p class="muted sm">${esc(t('eqGap')(fUSD(rowsSum), fUSD(Math.abs(gap)), gap >= 0))}</p></div>`;
+  return `${main}${eq}<div class="panel"><div class="tbl-wrap"><table class="mx">${head}${[...PLATS.map(row), row('total'), row('other')].join('')}</table></div></div>${nr}
     <ul class="notes"><li>${esc(t('otherHint'))}</li><li>${esc(t('wdNote'))}</li><li>${esc(t('waNote'))}</li><li>${esc(t('ohNote'))}</li></ul>`;
 }
 
