@@ -593,6 +593,7 @@ function partnersTab(ds, from, to) {
   };
   const cards = `<div class="sec-h"><h2>${esc(t('ptCards'))}</h2><p>${esc(t('ptCardsSub'))}</p></div><div class="pt-cards">${R.map(card).join('')}</div>`;
   const ads = R.flatMap(r => r.adList.map(a => ({ ...a, pn: r.p.name })));
+  const paid = R.reduce((x, r) => x + r.paid, 0), uplift = R.reduce((x, r) => x + r.uplift, 0);
   const C = t('ptAdCols');
   const adTable = `<div class="sec-h"><h2>${esc(t('ptAds'))}</h2><p>${esc(t('ptAdsSub'))}</p></div><div class="panel">${ads.length ? `<div class="tbl-wrap"><table class="lst pt-ads"><thead><tr>${C.map((c, i) => `<th${i >= 3 && i <= 7 ? ' class="n"' : ''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>
     ${ads.map(a => `<tr><td dir="auto">${esc(a.pn)}</td><td dir="auto" class="pt-an">${esc([a.c, a.as, a.ad].filter(Boolean).join(' › '))}<small class="muted">${esc(t('ptMatchedOn')[a.lvl])}: ${esc(a.nm)}</small>${a.q === 'fuzzy' ? `<small class="pt-fz">${esc(t('ptFuzzy'))}</small>` : ''}</td>
