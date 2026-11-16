@@ -258,6 +258,39 @@ function partnerSection(ds, from, to) {
 }
 
 // ---------------- rendering: initiatives ----------------
+const pageKey = v => String(v || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/^\/+|\/+$/g, '').replace(/\/(t\/[^/]+|track)$/, '');
+function pageSums(ds, from, to) {
+  const out = {}; for (const [d, k, se, ld] of (ds.web && ds.web.pages) || []) if (d >= from && d <= to) { const o = out[k] || (out[k] = { s: 0, l: 0 }); o.s += se; o.l += ld; }
+  return out;
+}
+function cvrCard(ds, i, a, b) {
+  const pages = (i.pages || []).map(pageKey).filter(Boolean);
+  if (!pages.length) return `<p class="muted pad0">${esc(t('cvrNoPages'))}</p>`;
+  const S = b >= a ? pageSums(ds, a, b) : {}, z = { s: 0, l: 0 };
+  const rows = pages.map(p => { const o = S[p] || z, base = p.replace(/\d+$/, ''), q = base !== p ? (S[base] || z) : null; return { p, s: o.s, l: o.l, cvr: div(o.l, o.s), base, bs: q && q.s, bcvr: q ? div(q.l, q.s) : null }; });
+  const sess = rows.reduce((x, r) => x + r.s, 0), leads = rows.reduce((x, r) => x + r.l, 0), cvr = div(leads, sess);
+  const live = rows.filter(r => r.s > 0 && r.bcvr != null), bS = live.reduce((x, r) => x + r.bs, 0), bL = live.reduce((x, r) => x + r.bcvr * r.bs, 0), bcvr = div(bL, bS);
+  const tg = i.cvr ? i.cvr / 100 : null, prim = tg && cvr != null ? cvr / tg : null, c = prim == null ? '' : prim >= 1 ? 'good' : prim >= 0.85 ? 'warn' : 'bad';
+  const fp = v => v == null ? t('dash') : fN(v * 100, 1) + '%', dv = (v, ref) => v == null || ref == null ? '' : `<span class="d ${v >= ref ? 'good' : 'bad'}">${v >= ref ? '+' : '−'}${fN(Math.abs(v - ref) * 100, 1)} pt</span>`;
+  if (!sess) return `<p class="muted pad0">${esc(t('cvrNoData'))}</p><p class="muted sm">${esc(pages.join(' · '))}</p>`;
+  return `<div class="in-nums"><div><div class="v">${num(fp(cvr))}</div><div class="k">${esc(t('cvrBig'))} ${bcvr != null ? `<small class="muted">${esc(t('cvrVs'))} ${num(fp(bcvr))}</small> ${dv(cvr, bcvr)}` : ''}</div></div><div><div class="v">${num(fN(leads))}</div><div class="k">${esc(t('cvrLeads'))} · ${num(fN(sess))} ${esc(t('cvrSess'))}</div></div></div>
+    ${prim == null ? `<p class="muted sm">${esc(t('inNoTarget'))}</p>` : bar(prim, c) + `<div class="t"><span>${esc(t('inTarget'))} ${num(fp(tg))}</span><span class="d ${c}">${num(fP(prim))} ${esc(t('inAch'))}</span></div>`}
+    <table class="lst in-src"><tr><th>${esc(t('cvrPage'))}</th><th>${esc(t('cvrSess'))}</th><th>CVR</th><th>${esc(t('cvrOldS'))}</th></tr>${rows.map(r => `<tr><td dir="ltr">/${esc(r.p)}</td><td>${num(fN(r.s))}</td><td>${num(fp(r.cvr))}${r.s ? `<br>${dv(r.cvr, r.bcvr)}` : ''}</td><td>${r.bcvr == null ? esc(t('dash')) : num(fp(r.bcvr))}</td></tr>`).join('')}</table>
+    <p class="muted sm">${esc(t('cvrNote')((ds.web && ds.web.leadEvent) || 'lead_submit'))}</p>`;
+}
+function reachCard(ds, i, a, b) {
+  const rows = (((ds.web && ds.web.social) || {}).tiktok || []).filter(r => r[0] >= a && r[0] <= b);
+  if (!rows.length) return `<p class="muted pad0">${esc(t('rcNoData'))}</p>`;
+  let last = null; for (const r of rows) if (r[1] > 0) last = r[0];
+  const done = rows.filter(r => last && r[0] <= last), sum = k => done.reduce((x, r) => x + (r[k] || 0), 0);
+  const reach = sum(1), views = sum(2), prof = sum(3), fol = sum(4), eng = sum(5), nd = done.length;
+  const fC = v => v == null || !isFinite(v) ? t('dash') : new Intl.NumberFormat(loc(), { notation: 'compact', maximumFractionDigits: 2 }).format(v);
+  const prim = i.reach && last ? reach / i.reach : null, c = prim == null ? '' : prim >= 1 ? 'good' : prim >= 0.7 ? 'warn' : 'bad';
+  return `<div class="in-nums"><div><div class="v">${num(fC(reach))}</div><div class="k">${esc(t('rcBig'))} · ${num(fC(div(reach, nd)))} ${esc(t('rcPerDay'))}</div></div><div><div class="v">${num(fC(views))}</div><div class="k">${esc(t('rcViews'))}</div></div></div>
+    ${prim == null ? `<p class="muted sm">${esc(t('inNoTarget'))}</p>` : bar(prim, c) + `<div class="t"><span>${esc(t('inTarget'))} ${num(fC(i.reach))}</span><span class="d ${c}">${num(fP(prim))} ${esc(t('inAch'))}</span></div>`}
+    <dl class="pt-kv"><dt>${esc(t('rcProfile'))}</dt><dd>${num(fN(prof))}</dd><dt>${esc(t('rcFollow'))}</dt><dd>${num(fN(fol))}</dd><dt>${esc(t('rcEng'))}</dt><dd>${num(fN(eng))}</dd></dl>
+    <p class="muted sm">${esc(t('rcNote')(last && last < b ? fDate(last) : ''))}</p>`;
+}
 function initSection(ds, from, to) {
   const I = settings.initiatives || [], order = { active: 0, planned: 1, paused: 2, done: 3 };
   const list = [...I].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
@@ -266,6 +299,8 @@ function initSection(ds, from, to) {
   const cards = list.map(i => {
     const a = i.start || from, b = i.end && i.end < to ? i.end : to, ids = i.sources || [];
     const head = `<div class="in-h"><b dir="auto">${esc(i.name)}</b><span class="stt st-${esc(i.status)}">${esc(t('st_' + i.status))}</span></div><div class="muted sm">${esc(fDate(i.start))} – ${esc(fDate(i.end))}</div>`;
+    if (i.type === 'cvr') return `<div class="kpi in-card">${head}${cvrCard(ds, i, a, b)}</div>`;
+    if (i.type === 'reach') return `<div class="kpi in-card">${head}${reachCard(ds, i, a, b)}</div>`;
     if (!ids.length) return `<div class="kpi in-card">${head}<p class="muted pad0">${esc(t('inUnlinked'))}</p></div>`;
     const S = b >= a ? sums(ds, a, b) : {}, per = ids.map(id => ({ id, ...(S[id] || { leads: 0, recv: 0, kg: 0 }) }));
     const leads = per.reduce((x, r) => x + r.leads, 0), recv = per.reduce((x, r) => x + r.recv, 0), kg = per.reduce((x, r) => x + r.kg, 0);
@@ -377,6 +412,33 @@ Object.assign(T.ar, {
   seChecks: 'قائمة الإطلاق', ckPage: 'صفحة الشريك ورسالة الإطلاق', ckPch: 'قنوات الشريك', ckAch: 'قنوات عون', seBand: 'النطاق (0.03 = ±3%)', seScen: n => `السيناريو ${n}`, sePick: 'السيناريو المختار',
 });
 const PL_STAGES = ['planning', 'communication', 'won', 'lost'];
+const NEW_PAGES = ['landingsnapchat2', 'landingmeta2', 'landingtiktok2', 'landinggoogle2'];
+Object.assign(T.en, {
+  inType: 'Measure', ty_leads: 'Leads from Odoo sources', ty_cvr: 'Landing page conversion rate', ty_reach: 'Organic social reach',
+  inPages: 'Landing pages', inPageHint: 'Type a page (e.g. landingtiktok2) and press Enter', inCvrT: 'Target conversion rate (%)', inReachT: 'Target reach',
+  cvrBig: 'Conversion rate', cvrLeads: 'Form submits', cvrSess: 'Sessions', cvrPage: 'Page', cvrOld: 'Original page', cvrOldS: 'Original', cvrVs: 'vs original',
+  cvrNote: e => `Conversion rate = form submits (GA4 event "${e}") ÷ sessions that started on the page. Original page = the same page without the number (e.g. landingtiktok for landingtiktok2), same dates.`,
+  cvrNoData: 'No visits to these pages in the initiative dates yet.', cvrNoPages: 'No landing pages set for this initiative.',
+  rcBig: 'Reached audience', rcViews: 'Video views', rcProfile: 'Profile views', rcFollow: 'New followers', rcEng: 'Engaged audience', rcPerDay: 'per day',
+  rcNote: d => `TikTok account (Windsor organic connector). Reach adds up the daily reached audience; TikTok reports it 1 to 2 days late${d ? `, so days after ${d} are not counted yet` : ''}. Instagram and Facebook will be added when they are connected in Windsor.`,
+  rcNoData: 'No organic social data yet (connect the accounts in Windsor).',
+  seInd: 'Indirect leads (not tracked by source or ads)', seIndDate: 'Date', seIndLeads: 'Leads', seIndNote: 'Note', seIndAdd: 'Add indirect leads',
+  ptIndirect: 'Indirect leads', ptIndirectSub: 'Entered in Settings for each partnership', ptEq3: 'Direct leads + uplift + indirect = partnership leads',
+  ptPerfTitle: 'Partnerships', ptPerfSub: 'Partnership leads against target for the selected dates', ptOpen: 'Open the Partnerships tab',
+});
+Object.assign(T.ar, {
+  inType: 'طريقة القياس', ty_leads: 'ليدز من مصادر Odoo', ty_cvr: 'معدل التحويل لصفحات الهبوط', ty_reach: 'الوصول العضوي في السوشال',
+  inPages: 'صفحات الهبوط', inPageHint: 'اكتب الصفحة (مثل landingtiktok2) ثم Enter', inCvrT: 'معدل التحويل المستهدف (%)', inReachT: 'الوصول المستهدف',
+  cvrBig: 'معدل التحويل', cvrLeads: 'النماذج المرسلة', cvrSess: 'الزيارات', cvrPage: 'الصفحة', cvrOld: 'الصفحة الأصلية', cvrOldS: 'الأصلية', cvrVs: 'مقابل الأصلية',
+  cvrNote: e => `معدل التحويل = النماذج المرسلة (حدث GA4 "${e}") ÷ الزيارات التي بدأت من الصفحة. الصفحة الأصلية = نفس الصفحة بدون الرقم (مثل landingtiktok مقابل landingtiktok2) لنفس التواريخ.`,
+  cvrNoData: 'لا توجد زيارات لهذه الصفحات في تواريخ المبادرة بعد.', cvrNoPages: 'لم تُحدد صفحات هبوط لهذه المبادرة.',
+  rcBig: 'الجمهور الذي تم الوصول إليه', rcViews: 'مشاهدات الفيديو', rcProfile: 'زيارات الحساب', rcFollow: 'متابعون جدد', rcEng: 'الجمهور المتفاعل', rcPerDay: 'في اليوم',
+  rcNote: d => `حساب تيك توك (موصل Windsor العضوي). الوصول = مجموع الجمهور اليومي؛ تيك توك يرسله متأخراً يوماً أو يومين${d ? `، لذلك الأيام بعد ${d} لم تُحسب بعد` : ''}. سيُضاف إنستغرام وفيسبوك عند ربطهما في Windsor.`,
+  rcNoData: 'لا توجد بيانات سوشال عضوية بعد (اربط الحسابات في Windsor).',
+  seInd: 'ليدز غير مباشرة (غير متتبعة بالمصدر أو الإعلانات)', seIndDate: 'التاريخ', seIndLeads: 'الليدز', seIndNote: 'ملاحظة', seIndAdd: 'إضافة ليدز غير مباشرة',
+  ptIndirect: 'ليدز غير مباشرة', ptIndirectSub: 'تُدخل من الإعدادات لكل شراكة', ptEq3: 'الليدز المباشرة + الزيادة + غير المباشرة = ليدز الشراكة',
+  ptPerfTitle: 'الشراكات', ptPerfSub: 'ليدز الشراكات مقابل المستهدف للتواريخ المحددة', ptOpen: 'فتح تبويب الشراكات',
+});
 Object.assign(T.en, { plTitle: 'Partnership flow', plSub: 'Companies at each stage. Nouf keeps the lists up to date in Settings.', pl_planning: 'Planning', pl_communication: 'Communication', pl_won: 'Won', pl_lost: 'Lost',
   plEmpty: 'No companies yet', plEdit: 'Edit in Settings', plSet: 'Partnership flow (companies by stage)', plSetSub: 'Add each company under its stage. Use "Stage" to move it when it progresses.', plCompany: 'Company', plNote: 'Note (optional)', plStage: 'Stage', plAdd: 'Add company', plCount: n => `${n} ${n === 1 ? 'company' : 'companies'}` });
 Object.assign(T.ar, { plTitle: 'مسار الشراكات', plSub: 'الشركات في كل مرحلة. نوف تحدّث القوائم من الإعدادات.', pl_planning: 'التخطيط', pl_communication: 'التواصل', pl_won: 'تم الاتفاق', pl_lost: 'لم يتم الاتفاق',
@@ -411,7 +473,7 @@ const cityOfText = s => { const n = normName(s); for (const [k, rx] of CITY_RX) 
 function ptData(ds, from, to) {
   const kp = ds.kpi || {}, P = (settings.partners || []).filter(p => p.name && p.name.trim());
   const inRange = (d, p) => d >= from && d <= to && (!p.start || d >= p.start) && (!p.end || d <= p.end);
-  const res = P.map(p => ({ p, srcs: new Set(p.sources || []), valid: 0, dup: 0, proh: 0, out: 0, recv: 0, kg: 0, ads: {}, nonPaid: (p.costs || []).reduce((a, c) => a + (Number(c.cost) || 0), 0) }));
+  const res = P.map(p => ({ p, srcs: new Set(p.sources || []), indirect: (p.indirect || []).filter(x => x && x.date && inRange(x.date, p)).reduce((a, x) => a + (Number(x.leads) || 0), 0), valid: 0, dup: 0, proh: 0, out: 0, recv: 0, kg: 0, ads: {}, nonPaid: (p.costs || []).reduce((a, c) => a + (Number(c.cost) || 0), 0) }));
   for (const r of res) {
     for (const [d, id, n] of kp.leads || []) if (r.srcs.has(id) && inRange(d, r.p)) r.valid += n;
     for (const [d, id, rs, n] of kp.lost || []) if (r.srcs.has(id) && inRange(d, r.p)) { if (rs === 36) r.dup += n; else if (rs === 37) r.proh += n; else if (rs === 40) r.out += n; }
@@ -445,7 +507,7 @@ function ptData(ds, from, to) {
       r.uplift += a.counted;
     }
     r.uplift = Math.round(r.uplift); r.gross = r.valid + r.dup + r.proh + r.out;
-    r.total = r.valid + r.uplift; r.spend = r.paid + r.nonPaid;
+    r.total = r.valid + r.uplift + r.indirect; r.spend = r.paid + r.nonPaid;
     r.tLeads = r.p.leads != null ? r.p.leads : (PT.leads && n ? PT.leads / n : null);
     r.tKg = r.p.kg != null ? r.p.kg : (PT.kg && n ? PT.kg / n : null);
   }
@@ -468,29 +530,40 @@ function pipelineBoard() {
       ${L.length ? `<ul>${L.map(c => `<li><span dir="auto">${esc(c.name)}</span>${c.note ? `<small class="muted" dir="auto">${esc(c.note)}</small>` : ''}</li>`).join('')}</ul>` : `<p class="muted sm">${esc(t('plEmpty'))}</p>`}</div>`; };
   return `<div class="sec-h"><h2>${esc(t('plTitle'))}</h2><p>${esc(t('plSub'))} <a href="#set" data-goset>${esc(t('plEdit'))}</a></p></div><div class="pl-board">${PL_STAGES.map(col).join('')}</div>`;
 }
+function ptHero(R, to) {
+  const PT = settings.partnerTargets || {}, f = ptPace(to);
+  const tot = k => R.reduce((a, r) => a + (r[k] || 0), 0);
+  const total = tot('total'), direct = tot('valid'), uplift = tot('uplift'), indirect = tot('indirect'), kg = tot('kg'), paid = tot('paid'), other = tot('nonPaid'), spend = paid + other;
+  const target = PT.leads || R.reduce((a, r) => a + (r.tLeads || 0), 0) || null, kgT = PT.kg || R.reduce((a, r) => a + (r.tKg || 0), 0) || null;
+  const should = target ? target * f : null, [pr, pl, pc] = ptStatus(total, should);
+  const bar = (v, tg, sh, cls) => tg ? `<div class="bar sp-bar"><i class="${cls === 'bad' ? 'bad' : cls === 'warn' ? 'warn' : ''}" style="width:${Math.min(100, v / tg * 100)}%"></i><b class="mark" style="inset-inline-start:${Math.min(100, sh / tg * 100)}%"></b></div>` : '';
+  return `<div class="pt-hero"><div class="panel sp-card"><div class="sp-top"><div class="sp-big">${num(fN(total))}<small>${esc(t('ptOfLeads'))} ${num(fN(target))} ${esc(t('ptLeadsU'))}</small></div>${pr !== '' ? `<span class="dchip ${pc}">${esc(pl)} · ${num(fP(pr))}</span>` : ''}</div>
+    ${bar(total, target, should, pc)}<div class="sp-row"><span>${esc(t('ptTargetL'))} ${num(fN(target))}</span><span>${esc(t('ptShould'))} ${num(fN(should))}</span><span>${esc(t('ptLeft'))} ${num(fN(target ? target - total : null))}</span></div></div>
+    <div class="pt-tiles"><div class="panel pt-tile dk"><div class="k">① ${esc(t('ptDirect'))}</div><div class="v">${num(fN(direct))}</div><div class="s">${esc(t('ptDirectSub'))}</div></div>
+    <div class="panel pt-tile"><div class="k">② ${esc(t('ptUplift'))}</div><div class="v">${num(fN(uplift))}</div><div class="s">${esc(t('ptUpliftSub'))}</div></div>
+    <div class="panel pt-tile"><div class="k">③ ${esc(t('ptIndirect'))}</div><div class="v">${num(fN(indirect))}</div><div class="s">${esc(t('ptIndirectSub'))}</div></div>
+    <div class="panel pt-tile"><div class="k">${esc(t('ptKgT'))}</div><div class="v">${num(fN(kg))} <small>kg</small></div><div class="s">${kgT ? esc(t('ptTargetL')) + ' ' + num(fN(kgT)) + ' kg · ' + esc(t('ptShould')) + ' ' + num(fN(kgT * f)) : ''}</div></div>
+    <div class="panel pt-tile"><div class="k">${esc(t('ptSpendT'))}</div><div class="v">${num(fUSD(spend))}</div><div class="s">${esc(t('ptSpendSub')(fUSD(paid), fUSD(other)))} · ${esc(t('ptCpk'))} ${num(fUSD(div(spend, kg), 3))}</div></div></div></div>
+    <p class="muted sm pt-eq">${esc(t('ptEq3'))}</p>`;
+}
+function ptPerfSection(ds, from, to) {
+  const R = ptData(ds, from, to);
+  const head = `<div class="sec-h"><h2>${esc(t('ptPerfTitle'))}</h2><p>${esc(fDate(from))} – ${esc(fDate(to))} · ${esc(t('ptPerfSub'))} · <a href="#pt" data-gopt>${esc(t('ptOpen'))}</a></p></div>`;
+  if (!R.length) return head + `<div class="panel"><p class="muted">${esc(t('ptNone'))}</p></div>`;
+  return head + ptHero(R, to);
+}
 function partnersTab(ds, from, to) {
   const R = ptData(ds, from, to), PT = settings.partnerTargets || {}, f = ptPace(to), CL = CITY_LBL[lang];
   const head = `<div class="sec-h"><h2>${esc(t('ptTitle'))}</h2><p>${esc(fDate(from))} – ${esc(fDate(to))} · ${esc(t('ptSub'))}</p></div>`;
   if (!R.length) return `${head}${pipelineBoard()}<div class="panel"><p class="muted">${esc(t('ptNone'))}</p><a href="#set" class="chip" data-goset>${esc(t('ptGo'))}</a></div>`;
-  const tot = k => R.reduce((a, r) => a + (r[k] || 0), 0);
-  const total = tot('total'), direct = tot('valid'), uplift = tot('uplift'), kg = tot('kg'), paid = tot('paid'), other = tot('nonPaid'), spend = paid + other;
-  const target = PT.leads || R.reduce((a, r) => a + (r.tLeads || 0), 0) || null, kgT = PT.kg || R.reduce((a, r) => a + (r.tKg || 0), 0) || null;
-  const should = target ? target * f : null, [pr, pl, pc] = ptStatus(total, should);
-  const bar = (v, tg, sh, cls) => tg ? `<div class="bar sp-bar"><i class="${cls === 'bad' ? 'bad' : cls === 'warn' ? 'warn' : ''}" style="width:${Math.min(100, v / tg * 100)}%"></i><b class="mark" style="inset-inline-start:${Math.min(100, sh / tg * 100)}%"></b></div>` : '';
-  const hero = `<div class="pt-hero"><div class="panel sp-card"><div class="sp-top"><div class="sp-big">${num(fN(total))}<small>${esc(t('ptOfLeads'))} ${num(fN(target))} ${esc(t('ptLeadsU'))}</small></div>${pr !== '' ? `<span class="dchip ${pc}">${esc(pl)} · ${num(fP(pr))}</span>` : ''}</div>
-    ${bar(total, target, should, pc)}<div class="sp-row"><span>${esc(t('ptTargetL'))} ${num(fN(target))}</span><span>${esc(t('ptShould'))} ${num(fN(should))}</span><span>${esc(t('ptLeft'))} ${num(fN(target ? target - total : null))}</span></div></div>
-    <div class="pt-tiles"><div class="panel pt-tile dk"><div class="k">① ${esc(t('ptDirect'))}</div><div class="v">${num(fN(direct))}</div><div class="s">${esc(t('ptDirectSub'))}</div></div>
-    <div class="panel pt-tile"><div class="k">② ${esc(t('ptUplift'))}</div><div class="v">${num(fN(uplift))}</div><div class="s">${esc(t('ptUpliftSub'))}</div></div>
-    <div class="panel pt-tile"><div class="k">${esc(t('ptKgT'))}</div><div class="v">${num(fN(kg))} <small>kg</small></div><div class="s">${kgT ? esc(t('ptTargetL')) + ' ' + num(fN(kgT)) + ' kg · ' + esc(t('ptShould')) + ' ' + num(fN(kgT * f)) : ''}</div></div>
-    <div class="panel pt-tile"><div class="k">${esc(t('ptSpendT'))}</div><div class="v">${num(fUSD(spend))}</div><div class="s">${esc(t('ptSpendSub')(fUSD(paid), fUSD(other)))} · ${esc(t('ptCpk'))} ${num(fUSD(div(spend, kg), 3))}</div></div></div></div>
-    <p class="muted sm pt-eq">${esc(t('ptEq'))}</p>`;
+  const hero = ptHero(R, to);
   const card = r => {
     const p = r.p, sh = r.tLeads ? r.tLeads * f : null, [rr, rl, rc] = (p.start && p.start > to) ? ['', t('ptNotStarted'), 'idle'] : ptStatus(r.total, sh), mx = Math.max(1, r.gross);
     const col = (v, cls, lab) => `<div><span class="num ${cls}">${v}</span><i class="${cls}" style="height:${Math.max(3, Math.abs(+String(v).replace(/[^\d]/g, '')) / mx * 100)}%"></i><em>${esc(lab)}</em></div>`;
     const ca = cpkAction(div(r.paid, r.kg));
     return `<div class="panel pt-card"><div class="pt-ch"><div><h3 dir="auto">${esc(p.name)}</h3><div class="muted sm">${esc((p.cities || []).join(' · ') || '')}${p.start ? ' · ' + esc(fDate(p.start)) : ''}${p.end ? ' – ' + esc(fDate(p.end)) : ''} · ${esc((p.sources || []).map(id => srcName(ds, id)).join(', ') || '–')}</div></div><span class="dchip ${rc}">${esc(rl)}${rr !== '' ? ' · ' + num(fP(rr)) : ''}</span></div>
       <div class="pt-wf">${col(fN(r.gross), 'g', t('wfGross'))}${col('−' + fN(r.dup), 'r', t('wfDup'))}${col('−' + fN(r.proh), 'r', t('wfProh'))}${col('−' + fN(r.out), 'r', t('wfOut'))}${col(fN(r.valid), 't', t('wfValid'))}</div>
-      <dl class="pt-kv"><dt>${esc(t('ptDirect'))}</dt><dd>${num(fN(r.valid))}</dd><dt>${esc(t('ptAdsN')(r.adList.length))}</dt><dd>${num(fN(r.uplift))}</dd><dt class="b">${esc(t('ptTotal'))}</dt><dd class="b">${num(fN(r.total))}</dd></dl>
+      <dl class="pt-kv"><dt>${esc(t('ptDirect'))}</dt><dd>${num(fN(r.valid))}</dd><dt>${esc(t('ptAdsN')(r.adList.length))}</dt><dd>${num(fN(r.uplift))}</dd>${r.indirect ? `<dt>${esc(t('ptIndirect'))}</dt><dd>${num(fN(r.indirect))}</dd>` : ''}<dt class="b">${esc(t('ptTotal'))}</dt><dd class="b">${num(fN(r.total))}</dd></dl>
       ${r.tLeads ? `<div class="pt-mini"><i class="${rc}" style="width:${Math.min(100, r.total / r.tLeads * 100)}%"></i><b style="inset-inline-start:${Math.min(100, f * 100)}%"></b></div><div class="muted sm">${num(fN(r.total))} / ${num(fN(r.tLeads))} · ${esc(t('ptShould'))} ${num(fN(sh))}</div>` : ''}
       <dl class="pt-kv"><dt>${esc(t('ptPick'))}</dt><dd>${num(fN(r.recv))}</dd><dt>${esc(t('ptKg'))}</dt><dd>${num(fN(r.kg))} kg${r.tKg ? ` <small class="muted">/ ${num(fN(r.tKg))}</small>` : ''}</dd></dl>
       <dl class="pt-kv"><dt>${esc(t('ptPaid'))}</dt><dd>${num(fUSD(r.paid))}</dd><dt>${esc(t('ptOther'))}</dt><dd>${num(fUSD(r.nonPaid))}</dd><dt class="b">${esc(t('ptSpend'))}</dt><dd class="b">${num(fUSD(r.spend))}</dd>
@@ -544,6 +617,8 @@ function partnerSettingsHTML(ds) {
       ${fld(t('seAliases'), chipsField(`partners.${i}.aliases`, p.aliases || [], t('seAliasHint'), 'dl-none'))}
       <div class="se-sub"><b>${esc(t('seCosts'))}</b>${(p.costs || []).map((c, j) => `<div class="se-grid">${fld(t('seCostName'), inp(`partners.${i}.costs.${j}.name`, c.name))}${fld(t('seCostAmt'), inp(`partners.${i}.costs.${j}.cost`, c.cost, 'number', 'min="0" step="1" inputmode="decimal"'))}<button class="chip" data-delcost="${i}.${j}">${esc(t('remove'))}</button></div>`).join('')}
         <button class="chip" data-newcost="${i}">+ ${esc(t('seCostAdd'))}</button></div>
+      <div class="se-sub"><b>${esc(t('seInd'))}</b>${(p.indirect || []).map((x, j) => `<div class="se-grid">${fld(t('seIndDate'), inp(`partners.${i}.indirect.${j}.date`, x.date, 'date'))}${fld(t('seIndLeads'), inp(`partners.${i}.indirect.${j}.leads`, x.leads, 'number', 'min="0" step="1" inputmode="numeric"'))}${fld(t('seIndNote'), inp(`partners.${i}.indirect.${j}.note`, x.note))}<button class="chip" data-delind="${i}.${j}">${esc(t('remove'))}</button></div>`).join('')}
+        <button class="chip" data-newind="${i}">+ ${esc(t('seIndAdd'))}</button></div>
       <div class="se-sub"><b>${esc(t('seChecks'))}</b><div class="se-cks">${chk(`partners.${i}.checks.page`, p.checks && p.checks.page, t('ckPage'))}${chk(`partners.${i}.checks.partnerCh`, p.checks && p.checks.partnerCh, t('ckPch'))}${chk(`partners.${i}.checks.awonCh`, p.checks && p.checks.awonCh, t('ckAch'))}</div></div>
       <button class="chip" data-del="partners.${i}">${esc(t('remove'))}</button></div>`).join('')}
     <button class="chip" data-new="partners">+ ${esc(t('add'))}</button>
@@ -567,7 +642,8 @@ function settingsHTML(ds) {
   const campNames = [...new Set(AD_PLATS.flatMap(p => ((ds.ads && ds.ads.cdet && ds.ads.cdet[p]) || []).map(x => x[1])))].sort();
   const months = [...new Set([m, (ctx.to || todayKSA()).slice(0, 7), ...Object.keys(settings.months)])].sort().reverse();
   const teamNames = (settings.team || []).map(x => x.name);
-  return `<datalist id="dl-src">${srcOpts}</datalist><datalist id="dl-camp">${campNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+  const pageOpts = [...new Set(((ds.web && ds.web.pages) || []).map(r => r[1]))].sort().map(k => `<option value="${esc(k)}">`).join('');
+  return `<datalist id="dl-page">${pageOpts}</datalist><datalist id="dl-src">${srcOpts}</datalist><datalist id="dl-camp">${campNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
   <div class="sec-h"><h2>${esc(t('seTitle'))}</h2><p>${esc(t('seSub'))}</p></div>
   ${persistent ? '' : `<div class="err warnbar">${esc(t('seDemo'))}</div>`}
   <div class="se-bar"><button class="chip" aria-pressed="true" id="seSave">${esc(t('seSave'))}</button><span id="seStatus" class="muted">${esc(status || (dirty ? t('seUnsaved') : ''))}</span></div>
@@ -597,8 +673,9 @@ function settingsHTML(ds) {
     ${(settings.initiatives || []).map((p, i) => `<div class="se-item"><div class="se-grid">${fld(t('name'), inp(`initiatives.${i}.name`, p.name))}
       ${fld(t('status'), `<select data-path="initiatives.${i}.status">${['planned', 'active', 'paused', 'done'].map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${esc(t('st_' + s))}</option>`).join('')}</select>`)}
       ${fld(t('start'), inp(`initiatives.${i}.start`, p.start, 'date'))}${fld(t('end'), inp(`initiatives.${i}.end`, p.end, 'date'))}
-      ${fld(t('tgtLeads'), inp(`initiatives.${i}.leads`, p.leads, 'number'))}</div>
-      ${fld(t('sources'), chipsField(`initiatives.${i}.sources`, p.sources || [], t('srcHint'), 'dl-src'))}
+      ${fld(t('inType'), `<select data-path="initiatives.${i}.type">${['leads', 'cvr', 'reach'].map(k => `<option value="${k}" ${(p.type || 'leads') === k ? 'selected' : ''}>${esc(t('ty_' + k))}</option>`).join('')}</select>`)}
+      ${p.type === 'cvr' ? fld(t('inCvrT'), inp(`initiatives.${i}.cvr`, p.cvr, 'number', 'step="0.1" min="0"')) : p.type === 'reach' ? fld(t('inReachT'), inp(`initiatives.${i}.reach`, p.reach, 'number', 'step="1000" min="0"')) : fld(t('tgtLeads'), inp(`initiatives.${i}.leads`, p.leads, 'number'))}</div>
+      ${p.type === 'cvr' ? fld(t('inPages'), chipsField(`initiatives.${i}.pages`, p.pages || [], t('inPageHint'), 'dl-page')) : p.type === 'reach' ? '' : fld(t('sources'), chipsField(`initiatives.${i}.sources`, p.sources || [], t('srcHint'), 'dl-src'))}
       <button class="chip" data-del="initiatives.${i}">${esc(t('remove'))}</button></div>`).join('')}
     <button class="chip" data-new="initiatives">+ ${esc(t('add'))}</button></section>
 
@@ -618,7 +695,7 @@ function wireSettings(root) {
     let v = el.value; if (el.type === 'number') v = v === '' ? null : Number(v); if (el.type === 'checkbox') v = el.checked; if (/\.pick$/.test(el.dataset.path)) v = Number(v);
     if (/\.status$|\.owner$|\.metric$|\.dir$/.test(el.dataset.path) || el.type === 'text' || el.type === 'date') { /* keep as string */ }
     setPath(settings, el.dataset.path, v); mark();
-    if (/\.metric$/.test(el.dataset.path)) renderSettings();
+    if (/\.metric$|\.type$/.test(el.dataset.path)) renderSettings();
   });
   root.addEventListener('change', e => {
     const el = e.target;
@@ -631,10 +708,12 @@ function wireSettings(root) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.rm != null) { const box = b.closest('.chips'), arr = getPath(settings, box.dataset.path) || [], v = b.dataset.rm; setPath(settings, box.dataset.path, arr.filter(x => String(x) !== v)); mark(); renderSettings(); }
     else if (b.dataset.del) { const [k, i] = b.dataset.del.split('.'); settings[k].splice(+i, 1); mark(); renderSettings(); }
-    else if (b.dataset.new) { settings[b.dataset.new].push(b.dataset.new === 'partners' ? { name: '', sources: [], start: '', end: '', leads: null, kg: null, cities: [], aliases: [], costs: [], checks: {} } : { name: '', status: 'planned', start: '', end: '', sources: [], leads: null }); mark(); renderSettings(); }
+    else if (b.dataset.new) { settings[b.dataset.new].push(b.dataset.new === 'partners' ? { name: '', sources: [], start: '', end: '', leads: null, kg: null, cities: [], aliases: [], costs: [], indirect: [], checks: {} } : { name: '', status: 'planned', type: 'leads', start: '', end: '', sources: [], pages: [], leads: null, cvr: null, reach: null }); mark(); renderSettings(); }
     else if (b.dataset.pladd) { settings.pipeline[b.dataset.pladd].push({ name: '', note: '' }); mark(); renderSettings(); const L = root.querySelectorAll(`[data-path^="pipeline.${b.dataset.pladd}."][data-path$=".name"]`); if (L.length) L[L.length - 1].focus(); }
     else if (b.dataset.pldel) { const [st, i] = b.dataset.pldel.split('.'); settings.pipeline[st].splice(+i, 1); mark(); renderSettings(); }
     else if (b.dataset.newsvc) { const m = b.dataset.newsvc; settings.months[m] = settings.months[m] || {}; settings.months[m].services = settings.months[m].services || { budget: null, items: [] }; settings.months[m].services.items = settings.months[m].services.items || []; settings.months[m].services.items.push({ name: '', cost: null }); mark(); renderSettings(); }
+    else if (b.dataset.newind != null) { const p = settings.partners[+b.dataset.newind]; p.indirect = p.indirect || []; p.indirect.push({ date: todayKSA(), leads: null, note: '' }); mark(); renderSettings(); }
+    else if (b.dataset.delind) { const [i, j] = b.dataset.delind.split('.'); settings.partners[+i].indirect.splice(+j, 1); mark(); renderSettings(); }
     else if (b.dataset.newcost != null) { const p = settings.partners[+b.dataset.newcost]; p.costs = p.costs || []; p.costs.push({ name: '', cost: null }); mark(); renderSettings(); }
     else if (b.dataset.delcost) { const [i, j] = b.dataset.delcost.split('.'); settings.partners[+i].costs.splice(+j, 1); mark(); renderSettings(); }
     else if (b.dataset.delsvc) { const [m, i] = b.dataset.delsvc.split('.'); settings.months[m].services.items.splice(+i, 1); mark(); renderSettings(); }
@@ -646,6 +725,7 @@ function addChip(el) {
   const box = el.closest('.chips'), val = el.value.trim(); if (!val) return;
   const path = box.dataset.path, arr = getPath(settings, path) || [];
   if (/sources$/.test(path)) { const s = ((ctx.ds.kpi && ctx.ds.kpi.sources) || []).find(x => x[1].toLowerCase() === val.toLowerCase()); if (!s) { el.value = ''; return; } if (!arr.includes(s[0])) arr.push(s[0]); }
+  else if (/\.pages$/.test(path)) { const k = pageKey(val); if (k && !arr.includes(k)) arr.push(k); }
   else if (!arr.includes(val)) arr.push(val);
   setPath(settings, path, arr); dirty = true; status = ''; renderSettings();
 }
@@ -676,9 +756,17 @@ async function loadSettings() {
   settings.partnerCpk = Object.assign({}, d.partnerCpk, (s && s.partnerCpk) || {});
   if (!Array.isArray(settings.partnerCpk.s) || settings.partnerCpk.s.every(v => v == null)) settings.partnerCpk.s = d.partnerCpk.s.slice();
   if (settings.partnerCpk.band == null) settings.partnerCpk.band = d.partnerCpk.band;
-  settings.partners = (settings.partners || []).map(p => ({ cities: [], aliases: [], costs: [], checks: {}, end: '', ...p }));
+  settings.partners = (settings.partners || []).map(p => ({ cities: [], aliases: [], costs: [], indirect: [], checks: {}, end: '', ...p }));
   if (!settings.team || !settings.team.length) settings.team = d.team;
   const pl = (s && s.pipeline) || {}; settings.pipeline = Object.fromEntries(PL_STAGES.map(st => [st, Array.isArray(pl[st]) ? pl[st].map(c => ({ name: '', note: '', ...c })) : []]));
+  // Initiatives saved before the "Measure" field existed: a CVR initiative measures the new landing pages,
+  // a reach initiative measures organic social reach (chosen by name; the team can change it in Settings)
+  for (const i of settings.initiatives || []) if (!i.type) {
+    const n = String(i.name || '');
+    if (/\bcvr\b|conversion|تحويل/i.test(n)) { i.type = 'cvr'; if (!(i.pages || []).length) i.pages = NEW_PAGES.slice(); }
+    else if (/reach|وصول/i.test(n)) i.type = 'reach';
+    else i.type = 'leads';
+  }
   saved = JSON.stringify(settings);
 }
 function box(id, html) { const el = $('#' + id); if (el) el.innerHTML = html; }
@@ -688,11 +776,12 @@ function renderAll() {
   const hasKpi = ds && ds.kpi && ds.kpi.mode !== 'error' && ds.kpi.leads;
   const guard = fn => { try { return fn(); } catch (e) { console.error(e); return `<div class="err">${esc(e.message)}</div>`; } };
   const tab = $('#tab-set'); if (tab) tab.textContent = t('tabSet');
-  if (!hasKpi) { for (const id of ['kpiSpend', 'kpiPartners', 'kpiInit', 'kpiTeam', 'kpiPt']) box(id, ctx.ds ? `<div class="err warnbar">${esc(t('noKpi'))}</div>` : ''); }
+  if (!hasKpi) { for (const id of ['kpiSpend', 'kpiPartners', 'kpiInit', 'kpiTeam', 'kpiPt', 'kpiPtPerf']) box(id, ctx.ds ? `<div class="err warnbar">${esc(t('noKpi'))}</div>` : ''); }
   else {
     if (!ctx.view || ctx.view === 'perf') {
       box('kpiSpend', guard(() => `<div class="kpi-sub"><div class="sec-h sub"><h3>${esc(t('spTitle'))}</h3><p>${esc(t('spSub'))}</p></div>${budgetCard(ds, to)}<div class="sec-h sub"><h3>${esc(t('mxTitle'))}</h3><p>${esc(t('mxSub'))}</p></div>${matrix(ds, from, to)}</div>`));
       box('kpiPartners', '');   // partnerships moved to their own tab
+      box('kpiPtPerf', guard(() => `<section class="kpi-sec pt">${ptPerfSection(ds, from, to)}</section>`));
       box('kpiInit', guard(() => `<section class="kpi-sec">${initSection(ds, from, to)}</section>`));
     }
     if (ctx.view === 'pt') box('kpiPt', guard(() => `<section class="kpi-sec pt">${partnersTab(ds, from, to)}</section>`));
@@ -710,7 +799,7 @@ function renderSettings() {
 async function render(c) {
   ctx = c; lang = c.lang;
   if (!settings) { await loadSettings(); }
-  if (!wired) { document.addEventListener('click', e => { if (e.target.closest('[data-goset]')) { e.preventDefault(); const b = $('#tab-set'); if (b) b.click(); } }); wired = true; }
+  if (!wired) { document.addEventListener('click', e => { if (e.target.closest('[data-goset]')) { e.preventDefault(); const b = $('#tab-set'); if (b) b.click(); } else if (e.target.closest('[data-gopt]')) { e.preventDefault(); const b = $('#tab-pt'); if (b) b.click(); } }); wired = true; }
   renderAll();
 }
 window.AwonKpi = { render, tabLabel: l => T[l].tabSet };

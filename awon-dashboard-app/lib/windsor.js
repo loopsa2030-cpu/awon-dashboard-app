@@ -16,7 +16,7 @@ const r2 = v => Math.round(v * 100) / 100;
 
 function configured() { return !!process.env.WINDSOR_API_KEY; }
 
-async function query(connector, account, fields, from, to) {
+async function query(connector, account, fields, from, to, filter) {
   const u = new URL('https://connectors.windsor.ai/' + connector);
   u.searchParams.set('api_key', process.env.WINDSOR_API_KEY);
   u.searchParams.set('fields', fields.join(','));
@@ -25,6 +25,7 @@ async function query(connector, account, fields, from, to) {
   u.searchParams.set('select_accounts', account);
   u.searchParams.set('refresh_since', '3d');
   u.searchParams.set('refresh_interval', '1h');
+  if (filter) u.searchParams.set('filter', JSON.stringify(filter));
   const res = await fetch(u);
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.error) throw new Error(`Windsor ${connector}: ${(j.error && (j.error.message || j.error.code)) || res.status}`);
@@ -96,4 +97,4 @@ async function load(from, to) {
   return { source: 'windsor', camps, cdet, adet, platforms: {}, ga, errors };
 }
 
-module.exports = { load, configured };
+module.exports = { load, configured, query };
