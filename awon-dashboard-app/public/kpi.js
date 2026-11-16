@@ -14,7 +14,7 @@ const T = {
     spTitle: 'Spend and spend quality', spSub: 'How much we should spend, how much we spent, and what each dollar brings back',
     budgetTitle: 'Budget against spend', budget: 'Full marketing budget', spent: 'Spent so far', spentPct: 'of budget', left: 'Left', should: 'Should have spent by today', pace: 'Spend pace',
     paceFast: 'Faster than plan', paceSlow: 'Slower than plan', paceOk: 'On plan', noBudget: 'No budget entered for this month yet. Add it in Settings.', setLink: 'Open settings',
-    eqMkt: 'Marketing spend', eqOh: 'Overhead', eqTot: 'Total spend', eqTotSub: 'Used for the Total row and the headline above', eqOhNone: 'None entered for these dates (Settings)',
+    g_mtd: 'Overhead (MTD tab)', eqMkt: 'Marketing spend', eqOh: 'Overhead', eqTot: 'Total spend', eqTotSub: 'Used for the Total row and the headline above', eqOhNone: 'None entered for these dates (Settings)',
     eqGap: (a, b, more) => `Platform rows below use each platform's own spend plus WhatsApp: ${a}, which is ${b} ${more ? 'more' : 'less'} than the marketing spend because the Daily tab splits ad spend by city (Qassim is filled by hand and campaigns without a city are left out).`,
     mxTitle: 'Spend quality by platform', mxSub: 'For the selected dates. Green is better than the reference, red is worse, grey has no reference.',
     mainKpi: 'Kilograms per $1,000', mainNote: 'The main number: we are a weight business, not a leads business.', ref: 'Reference',
@@ -54,7 +54,7 @@ const T = {
     spTitle: 'الصرف وجودته', spSub: 'كم لازم نصرف، كم صرفنا، وكم يرجع لنا كل دولار',
     budgetTitle: 'الميزانية مقابل الصرف', budget: 'ميزانية التسويق الكاملة', spent: 'صرفنا حتى اليوم', spentPct: 'من الميزانية', left: 'المتبقي', should: 'المفروض نكون صرفنا اليوم', pace: 'وتيرة الصرف',
     paceFast: 'أسرع من الخطة', paceSlow: 'أبطأ من الخطة', paceOk: 'على الخطة', noBudget: 'لم تُدخل ميزانية لهذا الشهر بعد. أضفها من الإعدادات.', setLink: 'فتح الإعدادات',
-    eqMkt: 'صرف التسويق', eqOh: 'التكاليف الأخرى', eqTot: 'إجمالي الصرف', eqTotSub: 'يُستخدم في صف الإجمالي والمؤشر الرئيسي أعلاه', eqOhNone: 'لا توجد مبالغ مُدخلة لهذه التواريخ (الإعدادات)',
+    g_mtd: 'التكاليف الأخرى (تبويب MTD)', eqMkt: 'صرف التسويق', eqOh: 'التكاليف الأخرى', eqTot: 'إجمالي الصرف', eqTotSub: 'يُستخدم في صف الإجمالي والمؤشر الرئيسي أعلاه', eqOhNone: 'لا توجد مبالغ مُدخلة لهذه التواريخ (الإعدادات)',
     eqGap: (a, b, more) => `صفوف المنصات أدناه تستخدم صرف كل منصة كما تسجله مع الواتساب: ${a}، أي ${more ? 'أكثر' : 'أقل'} بـ ${b} من صرف التسويق لأن التبويب اليومي يقسم صرف الإعلانات حسب المدينة (القصيم يُعبأ يدوياً والحملات بلا مدينة لا تُحسب).`,
     mxTitle: 'جودة الصرف لكل منصة', mxSub: 'للفترة المحددة. الأخضر أفضل من المرجع، والأحمر أسوأ، والرمادي بلا مرجع.',
     mainKpi: 'كيلو لكل 1,000 دولار', mainNote: 'الرقم الرئيسي: نحن في بزنس أوزان، مو بزنس ليدز.', ref: 'المرجع',
@@ -159,12 +159,14 @@ const monthGroup = (s, g) => (g === 'services' ? { budget: s.services && s.servi
 function overhead(from, to) {
   const out = { tools: 0, ugc: 0, production: 0, services: 0 };
   for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = addD(m + '-01', 32).slice(0, 7)) {
-    const s = settings.months[m]; if (!s) continue;
-    const ms = m + '-01', me = m + '-' + String(dim(m)).padStart(2, '0'), a = from > ms ? from : ms, y = addD(todayKSA(), -1), b = [to, me, y].sort()[0];
+    const s = settings.months[m] || {}, mtd = ctx && ctx.ds && ctx.ds.months && ctx.ds.months[m] && ctx.ds.months[m].overheadActual;
+    if (!mtd && !settings.months[m]) continue;
+    const ms = m + '-01', me = m + '-' + String(dim(m)).padStart(2, '0'), a = from > ms ? from : ms, y = addD(todayKSA(), -1), b = mtd ? [to, me].sort()[0] : [to, me, y].sort()[0];
     if (b < a) continue; const share = (Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1) / dim(m);
+    if (mtd) { out.mtd = (out.mtd || 0) + mtd * share; continue; }   // the MTD tab's month-end figure replaces the Settings items (as on the Performance tab)
     for (const g of OH) out[g] += (Number(monthGroup(s, g).spend) || 0) * share;
   }
-  out.total = OH.reduce((a, g) => a + out[g], 0); return out;
+  out.total = OH.reduce((a, g) => a + out[g], 0) + (out.mtd || 0); return out;
 }
 function groupData(ds, from, to) {
   const S = sums(ds, from, to), grp = {}, init = () => ({ leads: 0, recv: 0, kg: 0, coh: 0, spend: 0, nr: 0 });
@@ -242,7 +244,7 @@ function matrix(ds, from, to) {
       <p class="muted sm pad">${esc(t('nrProxy'))}</p></details>`
     : `<div class="panel nr"><p class="muted pad">${esc(t('nrNone'))}</p></div>`;
   const rowsSum = PLATS.reduce((a, p) => a + grp[p].spend, 0), gap = rowsSum - mk.total;
-  const ohBits = ['tools', 'ugc', 'production', 'services'].filter(g => oh[g] > 0).map(g => `${t('g_' + g)} ${fUSD(oh[g])}`).join(' · ');
+  const ohBits = ['tools', 'ugc', 'production', 'services', 'mtd'].filter(g => oh[g] > 0).map(g => `${t('g_' + g)} ${fUSD(oh[g])}`).join(' · ');
   const eq = `<div class="panel sp-eq"><div class="sp-eq-row">
       <div><span class="k">${esc(t('eqMkt'))}</span><b>${num(fUSD(mk.total))}</b><small>${esc(t('bkPaid'))} ${num(fUSD(mk.paid))} · ${esc(t('bkBrand'))} ${num(fUSD(mk.brand))} · ${esc(t('wa'))} ${num(fUSD(mk.wa))}</small></div>
       <i>+</i><div><span class="k">${esc(t('eqOh'))}</span><b>${num(fUSD(oh.total))}</b><small>${esc(ohBits || t('eqOhNone'))}</small></div>
@@ -757,7 +759,7 @@ async function save() {
       const j = await r.json(); persistent = j.persistent !== false;
     }
     try { localStorage.setItem('awon-kpi-settings', JSON.stringify(body)); } catch (e) {}
-    dirty = false; status = t('seSaved'); const s = $('#seStatus'); if (s) s.textContent = status; renderAll();
+    dirty = false; announce(); status = t('seSaved'); const s = $('#seStatus'); if (s) s.textContent = status; renderAll();
   } catch (e) { status = t('seFail') + ': ' + e.message; const s = $('#seStatus'); if (s) s.textContent = status; }
 }
 
@@ -817,9 +819,12 @@ function renderSettings() {
 }
 async function render(c) {
   ctx = c; lang = c.lang;
-  if (!settings) { await loadSettings(); }
+  if (!settings) { await loadSettings(); announce(); }
   if (!wired) { document.addEventListener('click', e => { if (e.target.closest('[data-goset]')) { e.preventDefault(); const b = $('#tab-set'); if (b) b.click(); } else if (e.target.closest('[data-gopt]')) { e.preventDefault(); const b = $('#tab-pt'); if (b) b.click(); } }); wired = true; }
   renderAll();
 }
-window.AwonKpi = { render, tabLabel: l => T[l].tabSet };
+// Other costs per month from Settings, for the Performance tab's total spend (public/calc.js)
+function overheadByMonth() { const o = {}; for (const [m, s] of Object.entries((settings && settings.months) || {})) { const v = OH.reduce((a, g) => a + (Number(monthGroup(s || {}, g).spend) || 0), 0); if (v > 0) o[m] = v; } return o; }
+const announce = () => { try { window.dispatchEvent(new Event('awon-settings')); } catch (e) {} };
+window.AwonKpi = { render, tabLabel: l => T[l].tabSet, overheadByMonth };
 })();

@@ -60,8 +60,8 @@ const T = {
     monthGran: m => `Snapshot mode only holds ${m} (top 320 districts); connect Odoo for exact dates and all districts.`,
     srcLine: (k, m, t) => `${k}: ${m}${t ? ' (' + t + ')' : ''}`,
     srcSheets: 'Google Sheets (Daily + Forecast tabs)', srcOdoo: 'Odoo CRM', srcAds: 'Supermetrics',
-    overheadNote: 'Targets include marketing overhead from the forecast. Actual spend is media spend from the Daily tab plus the actual monthly overhead entered in the MTD tab at month end (prorated by day, shown separately).',
-    ovhIncl: 'incl. overhead', ovhLbl: 'Overhead', ovhShare: p => `${p} of total spend`, ovhNone: 'Added at month end (MTD tab)',
+    overheadNote: 'Targets include marketing overhead from the forecast. Actual spend is marketing spend from the Daily tab plus overhead: the other costs entered in Settings (tools, UGC/IGC, production, services) up to yesterday, replaced by the MTD tab figure once it is entered at month end (prorated by day, shown separately).',
+    ovhIncl: 'incl. overhead', ovhLbl: 'Overhead', ovhShare: p => `${p} of total spend`, ovhNone: 'None entered yet (Settings or MTD tab)',
     dates: (a, b) => a === b ? a : `${a} → ${b}`, lastRep: d => `last reported day ${d}`,
     series: { spend: 'Spend', target: 'Spend target', kg: 'kg', cpk: 'CPK (7-day rolling)' },
   },
@@ -120,8 +120,8 @@ const T = {
     monthGran: m => `وضع اللقطة يحتوي على ${m} فقط (أعلى ٣٢٠ حياً)؛ اربط Odoo لعرض كل التواريخ والأحياء.`,
     srcLine: (k, m, t) => `${k}: ${m}${t ? ' (' + t + ')' : ''}`,
     srcSheets: 'Google Sheets (التبويب اليومي والتوقعات)', srcOdoo: 'Odoo CRM', srcAds: 'Supermetrics',
-    overheadNote: 'المستهدف يشمل المصاريف التسويقية العامة من التوقعات. الإنفاق الفعلي هو إنفاق الوسائط من التبويب اليومي مضافاً إليه المصاريف العامة الفعلية المدخلة في تبويب MTD نهاية الشهر (موزعة يومياً وتظهر بشكل منفصل).',
-    ovhIncl: 'شامل المصاريف العامة', ovhLbl: 'المصاريف العامة', ovhShare: p => `${p} من إجمالي الإنفاق`, ovhNone: 'تضاف نهاية الشهر (تبويب MTD)',
+    overheadNote: 'المستهدف يشمل المصاريف التسويقية العامة من التوقعات. الإنفاق الفعلي هو صرف التسويق من التبويب اليومي مضافاً إليه المصاريف العامة: التكاليف المدخلة في الإعدادات (الأدوات وUGC/IGC والإنتاج والخدمات) حتى أمس، وتحل محلها قيمة تبويب MTD عند إدخالها نهاية الشهر (موزعة يومياً وتظهر بشكل منفصل).',
+    ovhIncl: 'شامل المصاريف العامة', ovhLbl: 'المصاريف العامة', ovhShare: p => `${p} من إجمالي الإنفاق`, ovhNone: 'لا توجد بعد (الإعدادات أو تبويب MTD)',
     dates: (a, b) => a === b ? a : `${a} ← ${b}`, lastRep: d => `آخر يوم مسجل ${d}`,
     series: { spend: 'الإنفاق', target: 'مستهدف الإنفاق', kg: 'كغ', cpk: 'تكلفة الكيلو (متوسط ٧ أيام)' },
   },
@@ -247,6 +247,7 @@ async function fetchDataset(force) {
 function recompute() {
   const { from, to } = resolve(state);
   $('#perfErr').innerHTML = dataErr ? `<div class="err">${esc(dataErr)}</div>` : '';
+  if (dataset) dataset._ohSettings = window.AwonKpi && AwonKpi.overheadByMonth ? AwonKpi.overheadByMonth() : null;
   perf = dataset && window.AwonCalc ? AwonCalc.compute(dataset, from, to) : null;
   // the comparison covers as many days as are reported in the selected range
   const lr = perf && perf.range.lastReported;
@@ -265,6 +266,7 @@ function recompute() {
   render();
   if (!$('#view-map').hidden) ensureHeat();
 }
+window.addEventListener('awon-settings', () => { const k = JSON.stringify((window.AwonKpi && AwonKpi.overheadByMonth && AwonKpi.overheadByMonth()) || {}); if (dataset && k !== JSON.stringify(dataset._ohSettings || {})) recompute(); });
 function syncHeat(draw) {
   const { from, to } = resolve(state);
   heat = heatCache.get(from + '|' + to) || null;

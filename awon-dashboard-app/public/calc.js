@@ -175,15 +175,19 @@
     }
     if (estimated) notes.push('Some kg-by-source splits were estimated from lead share (no Odoo attribution for that city).');
 
-    // Actual marketing overhead (entered in the MTD tab at month end): prorated per day, added to total spend and
-    // shared across cities and groups by their direct spend, and kept visible as its own figure.
+    // Actual marketing overhead: the MTD tab's figure once entered at month end; until then the other costs entered in
+    // Settings (tools, UGC/IGC, production, services; ds._ohSettings, per month) up to yesterday. Prorated per day, added
+    // to total spend and shared across cities and groups by their direct spend, and kept visible as its own figure.
     let overheadA = 0;
+    const yday = new Date(Date.now() + 3 * 3600e3 - 864e5).toISOString().slice(0, 10);
     const directC = Object.values(cities).reduce((a, x) => a + x.spend, 0);
     const directG = GROUPS.reduce((a, g) => a + groups[g].spend, 0);
     for (const d of eachDay(from, to)) {
       const mk = d.slice(0, 7), m = ds.months[mk];
-      if (!m || !m.overheadActual) continue;
-      const oh = m.overheadActual / ((m.forecast && m.forecast.daysInMonth) || dim(mk));
+      const fromMtd = m && m.overheadActual, fromSet = !fromMtd && ds._ohSettings && ds._ohSettings[mk];
+      if (!fromMtd && !(fromSet > 0)) continue;
+      if (!fromMtd && d > yday) continue;
+      const oh = (fromMtd || fromSet) / dim(mk);
       overheadA += oh; day(d).spend += oh;
     }
     if (overheadA && directC > 0) {
