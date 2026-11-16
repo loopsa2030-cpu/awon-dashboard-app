@@ -39,7 +39,7 @@ function clean(b) {
     partners: list(b.partners, 60).map(p => ({ name: str(p.name), sources: ids(p.sources), start: str(p.start, 10), end: str(p.end, 10), leads: num(p.leads), kg: num(p.kg),
       cities: strs(p.cities, 12), aliases: strs(p.aliases, 20),
       costs: list(p.costs, 40).map(c => ({ name: str(c && c.name), cost: num(c && c.cost) })),
-      indirect: list(p.indirect, 200).map(x => ({ date: str(x && x.date, 10), leads: num(x && x.leads), note: str(x && x.note, 200) })).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.date)),
+      indirectLeads: num(p.indirectLeads) != null ? num(p.indirectLeads) : (Array.isArray(p.indirect) && p.indirect.length ? list(p.indirect, 200).reduce((a, x) => a + (num(x && x.leads) || 0), 0) || null : null),
       checks: { page: !!(p.checks && p.checks.page), partnerCh: !!(p.checks && p.checks.partnerCh), awonCh: !!(p.checks && p.checks.awonCh) } })),
     partnerBench: Object.fromEntries(['tiktok', 'snapchat', 'meta', 'google'].map(pl => [pl, Object.fromEntries(Object.entries((b.partnerBench && b.partnerBench[pl]) || {}).filter(([k]) => /^[a-z]{2,12}$/.test(k)).map(([k, v]) => [k, num(v)]))])),
     partnerCpk: { pick: [1, 2, 3].includes(Number(b.partnerCpk && b.partnerCpk.pick)) ? Number(b.partnerCpk.pick) : 2, s: [0, 1, 2].map(i => num(b.partnerCpk && b.partnerCpk.s && b.partnerCpk.s[i])), band: num(b.partnerCpk && b.partnerCpk.band) },

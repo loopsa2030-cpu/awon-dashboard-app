@@ -443,7 +443,7 @@ Object.assign(T.en, {
   rcBig: 'Reached audience', rcViews: 'Video views', rcProfile: 'Profile views', rcFollow: 'New followers', rcEng: 'Engaged audience', rcPerDay: 'per day',
   rcNote: d => `TikTok account (Windsor organic connector). Reach adds up the daily reached audience; TikTok reports it 1 to 2 days late${d ? `, so days after ${d} are not counted yet` : ''}. Instagram and Facebook will be added when they are connected in Windsor.`,
   rcNoData: 'No organic social data yet (connect the accounts in Windsor).',
-  seInd: 'Indirect leads (not tracked by source or ads)', seIndDate: 'Date', seIndLeads: 'Leads', seIndNote: 'Note', seIndAdd: 'Add indirect leads',
+  seIndBulk: 'Indirect leads (total, not tracked by source or ads)', seInd: 'Indirect leads (not tracked by source or ads)', seIndDate: 'Date', seIndLeads: 'Leads', seIndNote: 'Note', seIndAdd: 'Add indirect leads',
   ptIndirect: 'Indirect leads', ptIndirectSub: 'Entered in Settings for each partnership', ptEq3: 'Direct leads + uplift + indirect = partnership leads',
   ptPerfTitle: 'Partnerships', ptPerfSub: 'Partnership leads against target for the selected dates', ptOpen: 'Open the Partnerships tab',
 });
@@ -456,7 +456,7 @@ Object.assign(T.ar, {
   rcBig: 'الجمهور الذي تم الوصول إليه', rcViews: 'مشاهدات الفيديو', rcProfile: 'زيارات الحساب', rcFollow: 'متابعون جدد', rcEng: 'الجمهور المتفاعل', rcPerDay: 'في اليوم',
   rcNote: d => `حساب تيك توك (موصل Windsor العضوي). الوصول = مجموع الجمهور اليومي؛ تيك توك يرسله متأخراً يوماً أو يومين${d ? `، لذلك الأيام بعد ${d} لم تُحسب بعد` : ''}. سيُضاف إنستغرام وفيسبوك عند ربطهما في Windsor.`,
   rcNoData: 'لا توجد بيانات سوشال عضوية بعد (اربط الحسابات في Windsor).',
-  seInd: 'ليدز غير مباشرة (غير متتبعة بالمصدر أو الإعلانات)', seIndDate: 'التاريخ', seIndLeads: 'الليدز', seIndNote: 'ملاحظة', seIndAdd: 'إضافة ليدز غير مباشرة',
+  seIndBulk: 'الليدز غير المباشرة (العدد الإجمالي، غير متتبعة بالمصدر أو الإعلانات)', seInd: 'ليدز غير مباشرة (غير متتبعة بالمصدر أو الإعلانات)', seIndDate: 'التاريخ', seIndLeads: 'الليدز', seIndNote: 'ملاحظة', seIndAdd: 'إضافة ليدز غير مباشرة',
   ptIndirect: 'ليدز غير مباشرة', ptIndirectSub: 'تُدخل من الإعدادات لكل شراكة', ptEq3: 'الليدز المباشرة + الزيادة + غير المباشرة = ليدز الشراكة',
   ptPerfTitle: 'الشراكات', ptPerfSub: 'ليدز الشراكات مقابل المستهدف للتواريخ المحددة', ptOpen: 'فتح تبويب الشراكات',
 });
@@ -494,7 +494,7 @@ const cityOfText = s => { const n = normName(s); for (const [k, rx] of CITY_RX) 
 function ptData(ds, from, to) {
   const kp = ds.kpi || {}, P = (settings.partners || []).filter(p => p.name && p.name.trim());
   const inRange = (d, p) => d >= from && d <= to && (!p.start || d >= p.start) && (!p.end || d <= p.end);
-  const res = P.map(p => ({ p, srcs: new Set(p.sources || []), indirect: (p.indirect || []).filter(x => x && x.date && inRange(x.date, p)).reduce((a, x) => a + (Number(x.leads) || 0), 0), valid: 0, dup: 0, proh: 0, out: 0, recv: 0, kg: 0, ads: {}, nonPaid: (p.costs || []).reduce((a, c) => a + (Number(c.cost) || 0), 0) }));
+  const res = P.map(p => ({ p, srcs: new Set(p.sources || []), indirect: (!p.start || p.start <= to) && (!p.end || p.end >= from) ? Number(p.indirectLeads) || 0 : 0, valid: 0, dup: 0, proh: 0, out: 0, recv: 0, kg: 0, ads: {}, nonPaid: (p.costs || []).reduce((a, c) => a + (Number(c.cost) || 0), 0) }));
   for (const r of res) {
     for (const [d, id, n] of kp.leads || []) if (r.srcs.has(id) && inRange(d, r.p)) r.valid += n;
     for (const [d, id, rs, n] of kp.lost || []) if (r.srcs.has(id) && inRange(d, r.p)) { if (rs === 36) r.dup += n; else if (rs === 37) r.proh += n; else if (rs === 40) r.out += n; }
@@ -634,12 +634,12 @@ function partnerSettingsHTML(ds) {
     ${(settings.partners || []).map((p, i) => `<div class="se-item"><div class="se-grid">${fld(t('name'), inp(`partners.${i}.name`, p.name))}${fld(t('start'), inp(`partners.${i}.start`, p.start, 'date'))}${fld(t('seEnd'), inp(`partners.${i}.end`, p.end, 'date'))}
       ${fld(t('tgtLeads'), inp(`partners.${i}.leads`, p.leads, 'number'))}${fld(t('tgtKg'), inp(`partners.${i}.kg`, p.kg, 'number'))}</div>
       ${fld(t('sources'), chipsField(`partners.${i}.sources`, p.sources || [], t('srcHint'), 'dl-src'))}
+      <div class="se-grid">${fld(t('seIndBulk'), inp(`partners.${i}.indirectLeads`, p.indirectLeads, 'number', 'min="0" step="1" inputmode="numeric"'))}</div>
       ${fld(t('seCities'), chipsField(`partners.${i}.cities`, p.cities || [], t('seCityHint'), 'dl-city'))}
       ${fld(t('seAliases'), chipsField(`partners.${i}.aliases`, p.aliases || [], t('seAliasHint'), 'dl-none'))}
       <div class="se-sub"><b>${esc(t('seCosts'))}</b>${(p.costs || []).map((c, j) => `<div class="se-grid">${fld(t('seCostName'), inp(`partners.${i}.costs.${j}.name`, c.name))}${fld(t('seCostAmt'), inp(`partners.${i}.costs.${j}.cost`, c.cost, 'number', 'min="0" step="1" inputmode="decimal"'))}<button class="chip" data-delcost="${i}.${j}">${esc(t('remove'))}</button></div>`).join('')}
         <button class="chip" data-newcost="${i}">+ ${esc(t('seCostAdd'))}</button></div>
-      <div class="se-sub"><b>${esc(t('seInd'))}</b>${(p.indirect || []).map((x, j) => `<div class="se-grid">${fld(t('seIndDate'), inp(`partners.${i}.indirect.${j}.date`, x.date, 'date'))}${fld(t('seIndLeads'), inp(`partners.${i}.indirect.${j}.leads`, x.leads, 'number', 'min="0" step="1" inputmode="numeric"'))}${fld(t('seIndNote'), inp(`partners.${i}.indirect.${j}.note`, x.note))}<button class="chip" data-delind="${i}.${j}">${esc(t('remove'))}</button></div>`).join('')}
-        <button class="chip" data-newind="${i}">+ ${esc(t('seIndAdd'))}</button></div>
+
       <div class="se-sub"><b>${esc(t('seChecks'))}</b><div class="se-cks">${chk(`partners.${i}.checks.page`, p.checks && p.checks.page, t('ckPage'))}${chk(`partners.${i}.checks.partnerCh`, p.checks && p.checks.partnerCh, t('ckPch'))}${chk(`partners.${i}.checks.awonCh`, p.checks && p.checks.awonCh, t('ckAch'))}</div></div>
       <button class="chip" data-del="partners.${i}">${esc(t('remove'))}</button></div>`).join('')}
     <button class="chip" data-new="partners">+ ${esc(t('add'))}</button>
@@ -729,12 +729,10 @@ function wireSettings(root) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.rm != null) { const box = b.closest('.chips'), arr = getPath(settings, box.dataset.path) || [], v = b.dataset.rm; setPath(settings, box.dataset.path, arr.filter(x => String(x) !== v)); mark(); renderSettings(); }
     else if (b.dataset.del) { const [k, i] = b.dataset.del.split('.'); settings[k].splice(+i, 1); mark(); renderSettings(); }
-    else if (b.dataset.new) { settings[b.dataset.new].push(b.dataset.new === 'partners' ? { name: '', sources: [], start: '', end: '', leads: null, kg: null, cities: [], aliases: [], costs: [], indirect: [], checks: {} } : { name: '', status: 'planned', type: 'leads', start: '', end: '', sources: [], pages: [], leads: null, cvr: null, reach: null }); mark(); renderSettings(); }
+    else if (b.dataset.new) { settings[b.dataset.new].push(b.dataset.new === 'partners' ? { name: '', sources: [], start: '', end: '', leads: null, kg: null, cities: [], aliases: [], costs: [], indirectLeads: null, checks: {} } : { name: '', status: 'planned', type: 'leads', start: '', end: '', sources: [], pages: [], leads: null, cvr: null, reach: null }); mark(); renderSettings(); }
     else if (b.dataset.pladd) { settings.pipeline[b.dataset.pladd].push({ name: '', note: '' }); mark(); renderSettings(); const L = root.querySelectorAll(`[data-path^="pipeline.${b.dataset.pladd}."][data-path$=".name"]`); if (L.length) L[L.length - 1].focus(); }
     else if (b.dataset.pldel) { const [st, i] = b.dataset.pldel.split('.'); settings.pipeline[st].splice(+i, 1); mark(); renderSettings(); }
     else if (b.dataset.newsvc) { const m = b.dataset.newsvc; settings.months[m] = settings.months[m] || {}; settings.months[m].services = settings.months[m].services || { budget: null, items: [] }; settings.months[m].services.items = settings.months[m].services.items || []; settings.months[m].services.items.push({ name: '', cost: null }); mark(); renderSettings(); }
-    else if (b.dataset.newind != null) { const p = settings.partners[+b.dataset.newind]; p.indirect = p.indirect || []; p.indirect.push({ date: todayKSA(), leads: null, note: '' }); mark(); renderSettings(); }
-    else if (b.dataset.delind) { const [i, j] = b.dataset.delind.split('.'); settings.partners[+i].indirect.splice(+j, 1); mark(); renderSettings(); }
     else if (b.dataset.newcost != null) { const p = settings.partners[+b.dataset.newcost]; p.costs = p.costs || []; p.costs.push({ name: '', cost: null }); mark(); renderSettings(); }
     else if (b.dataset.delcost) { const [i, j] = b.dataset.delcost.split('.'); settings.partners[+i].costs.splice(+j, 1); mark(); renderSettings(); }
     else if (b.dataset.delsvc) { const [m, i] = b.dataset.delsvc.split('.'); settings.months[m].services.items.splice(+i, 1); mark(); renderSettings(); }
@@ -777,7 +775,10 @@ async function loadSettings() {
   settings.partnerCpk = Object.assign({}, d.partnerCpk, (s && s.partnerCpk) || {});
   if (!Array.isArray(settings.partnerCpk.s) || settings.partnerCpk.s.every(v => v == null)) settings.partnerCpk.s = d.partnerCpk.s.slice();
   if (settings.partnerCpk.band == null) settings.partnerCpk.band = d.partnerCpk.band;
-  settings.partners = (settings.partners || []).map(p => ({ cities: [], aliases: [], costs: [], indirect: [], checks: {}, end: '', ...p }));
+  settings.partners = (settings.partners || []).map(p => { const q = { cities: [], aliases: [], costs: [], checks: {}, end: '', ...p };
+    // indirect leads were briefly a dated list; keep their sum as the single number
+    if (q.indirectLeads == null && Array.isArray(q.indirect) && q.indirect.length) q.indirectLeads = q.indirect.reduce((a, x) => a + (Number(x && x.leads) || 0), 0) || null;
+    delete q.indirect; return q; });
   if (!settings.team || !settings.team.length) settings.team = d.team;
   const pl = (s && s.pipeline) || {}; settings.pipeline = Object.fromEntries(PL_STAGES.map(st => [st, Array.isArray(pl[st]) ? pl[st].map(c => ({ name: '', note: '', ...c })) : []]));
   // Initiatives saved before the "Measure" field existed: a CVR initiative measures the new landing pages,
