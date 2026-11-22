@@ -203,7 +203,10 @@ function budgetCard(ds, to) {
   const fcB = k => fcCities.reduce((a, c) => a + ((c[k] && c[k].budget) || 0), 0) || null;
   const gb = (g, k) => Number(s[g] && s[g].budget) || fcB(k);
   const bPaid = gb('paid', 'paid'), bBrand = gb('branding', 'organic'), bWa = gb('wa', 'wa');
-  const spent = ads + wa + oh.total, bsum = (bPaid || 0) + (bBrand || 0) + (bWa || 0) + OH.reduce((a, g) => a + (Number(monthGroup(s, g).budget) || 0), 0), budget = s.budget || bsum || null;
+  // Full budget: the Settings value when entered; otherwise the forecast's Total Spending = paid + branding + WhatsApp
+  // budgets + IGC/UGC and on-ground budgets + marketing overhead (as the headline target); the Settings items only when there is no forecast
+  const fcM = ds.months && ds.months[m] && ds.months[m].forecast, ohB = fcM && fcM.overhead ? fcM.overhead : OH.reduce((a, g) => a + (Number(monthGroup(s, g).budget) || 0), 0);
+  const spent = ads + wa + oh.total, bsum = (bPaid || 0) + (bBrand || 0) + (bWa || 0) + ohB, budget = s.budget || bsum || null;
   const brk = [[t('bkPaid'), paid, bPaid], [t('bkBrand'), brand, bBrand], [t('wa'), wa, bWa], ...OH.map(g => [t('g_' + g), oh[g], monthGroup(s, g).budget])];
   const rows = `<div class="sp-brk">${brk.map(([l, v, bd]) => `<div><span>${esc(l)}</span><b>${num(fUSD(v))}</b>${bd ? `<small>${esc(t('ofBudget'))} ${num(fUSD(bd))}</small>` : '<small></small>'}</div>`).join('')}</div>`;
   if (!budget) return `<div class="panel sp-card"><h3 class="ch">${esc(t('budgetTitle'))}</h3><p class="muted">${esc(t('noBudget'))} <a href="#set" data-goset>${esc(t('setLink'))}</a></p><div class="sp-big">${num(fUSD(spent))}<small>${esc(t('spent'))}</small></div>${rows}</div>`;

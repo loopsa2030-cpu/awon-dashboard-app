@@ -143,6 +143,7 @@ function parseForecast(ws) {
     paidBudget: col(/^paid budget/), paidLeads: col(/^paid leads/),
     brandBudget: col(/^branding budget/), orgLeads: col(/^organic leads/),
     waBudget: col(/^wa budget/), waLeads: col(/^wa leads/),
+    ugcBudget: col(/^(igc ?\/ ?ugc|ugc ?\/ ?igc|ugc|igc) budget/), ogBudget: col(/^on[- ]?ground budget/),
     drivers: col(/^drivers/), days: col(/^days of op/),
     pickups: col(/^pickups ?\/ ?month/), avgKg: col(/^avg (kg|weight) ?\/ ?pickup/),
     weight: col(/^expected monthly weight/), totalLeads: col(/^total leads ?\/ ?month/), dailyLeads: col(/^daily leads$/),
@@ -166,6 +167,7 @@ function parseForecast(ws) {
       paid: { budget: v('paidBudget'), leads: v('paidLeads') },
       organic: { budget: v('brandBudget'), leads: v('orgLeads') },
       wa: { budget: v('waBudget'), leads: v('waLeads') },
+      extra: v('ugcBudget') + v('ogBudget'),   // IGC/UGC and on-ground budgets: part of the monthly budget, not media
       drivers: v('drivers'), opDays: v('days'),
       pickups: v('pickups'), avgKg: v('avgKg'), weight: v('weight'), totalLeads: v('totalLeads'), dailyLeads: v('dailyLeads'),
     });
@@ -177,7 +179,7 @@ function parseForecast(ws) {
     const tw = num(totalRow[C.weight]), tp = C.pickups >= 0 ? num(totalRow[C.pickups]) : null;
     const sw = cities.reduce((a, c) => a + c.weight, 0), sp = cities.reduce((a, c) => a + c.pickups, 0);
     if (tw !== null && sw - tw > 1) {
-      const i = cities.findIndex(c => Math.abs(c.weight - (sw - tw)) < 1 && (tp === null || Math.abs(c.pickups - (sp - tp)) < 1));
+      const i = cities.findIndex(c => Math.abs(c.weight - (sw - tw)) < 1 && (tp === null || Math.abs(c.pickups - (sp - tp)) <= 2));
       if (i >= 0) excluded.push(cities.splice(i, 1)[0].city);
     }
   }
@@ -216,7 +218,11 @@ function parseForecast(ws) {
       c.overhead = overhead * share;
     }
   });
-  return { cities, daysInMonth, overhead, excluded };
+  // IGC/UGC and on-ground budgets are in the sheet's Monthly Budget and Total Spending but are not paid, branding or
+  // WhatsApp media: they are carried with the overhead so the month's spend target matches the sheet's Total Spending.
+  const extra = cities.reduce((a, c) => a + (c.extra || 0), 0);
+  if (extra > 0) { cities.forEach(c => { c.overhead += c.extra || 0; }); overhead += extra; }
+  return { cities, daysInMonth, overhead, extraBudget: extra, overheadSheet: overhead - extra, excluded };
 }
 
 
