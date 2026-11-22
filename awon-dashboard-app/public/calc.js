@@ -196,6 +196,14 @@
     }
     for (const c of Object.values(cities)) for (const k of Object.keys(blank())) total[k] += c[k];
     total.overhead = overheadA;
+    // Open orders, as the team's Odoo filter "Open Orders by Month": scheduled pickup date in the period and status not
+    // Received or Cancelled. When the period reaches today, pickups already scheduled for the rest of that month count too.
+    if (ds.odoo.open) {
+      const today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+      const oTo = to >= today ? to.slice(0, 7) + '-' + String(dim(to.slice(0, 7))).padStart(2, '0') : to;
+      for (const k of Object.keys(oOpen)) delete oOpen[k];
+      for (const [d, city, n] of ds.odoo.open) if (d >= from && d <= oTo) (oOpen[city] || (oOpen[city] = [0, 0]))[0] += n;
+    }
     total.open = Object.values(oOpen).reduce((x, v) => x + Math.max(0, v[0] - v[1]), 0);
     const cityList = Object.values(cities)
       .filter(c => c.spend || c.spendT || c.leads || c.weight)

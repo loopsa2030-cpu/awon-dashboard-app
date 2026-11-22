@@ -73,6 +73,13 @@ async function odooPart(to) {
   };
 
   history.load().catch(() => {});      // start fetching the history sheet in parallel
+  // Open orders as the team's Odoo filter "Open Orders by Month": scheduled pickup date (date_deadline) in the period and
+  // delivery status not Received (6) or Cancelled (5). Pulled to the end of the current month so future pickups count.
+  const mEnd = (() => { const d = new Date(to + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + 1, 0); return d.toISOString().slice(0, 10); })();
+  const openP = odoo.readGroup('crm.lead', [...odoo.SCOPE, ['date_deadline', '>=', FIRST_MONTH + '-01'], ['date_deadline', '<=', mEnd], ['delivery_status', 'not in', ['5', '6']]],
+    ['total_weight:sum'], ['date_deadline:day', 'state_id'])
+    .then(gs => gs.map(g => { const d = g.__range && g.__range['date_deadline:day'] && String(g.__range['date_deadline:day'].from).slice(0, 10); return d ? [d, cityKey(stateName(g.state_id)) || 'unknown', g.__count] : null; }).filter(Boolean))
+    .catch(e => { console.error('open orders', e.message); return null; });
   const [res, won] = await Promise.all([
     odoo.readGroup('crm.lead', [...odoo.SCOPE, ...odoo.ksaRange('create_date', FIRST_MONTH + '-01', to)],
       ['total_weight:sum'], ['create_date:day', 'state_id', 'source_id', 'stage_id']),
@@ -106,7 +113,7 @@ async function odooPart(to) {
   try { hist = await withTimeout(history.load(), 120000, 'Customer history sheet'); }
   catch (e) { histNote = 'Customer history sheet: ' + e.message; }
   if (!hist || !hist.size) {
-    return { rows: [...agg.values()], donors: { base: FIRST_MONTH + '-01', rows: [], historyPhones: 0, unavailable: true, note: histNote || 'Customer history sheet is empty' },
+    return { rows: [...agg.values()], open: await openP, donors: { base: FIRST_MONTH + '-01', rows: [], historyPhones: 0, unavailable: true, note: histNote || 'Customer history sheet is empty' },
       meta: { mode: 'live', favourites: fav.used, unassigned: [...unassignedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[0]) } };
   }
   const base = Date.parse(FIRST_MONTH + '-01T00:00:00Z');
@@ -136,6 +143,7 @@ async function odooPart(to) {
     console.log('donors check ' + JSON.stringify({ month: m0.slice(0, 7), donors: month.size, newWithHistory: nH, newOdooOnly: nO, historyPhones: hist.size }));
   } catch (e) { console.error('donors check failed', e.message); }
   return {
+    open: await openP,
     rows: [...agg.values()],
     donors: { base: FIRST_MONTH + '-01', rows: donorRows, historyPhones: hist.size, note: null },
     meta: { mode: 'live', favourites: fav.used, unassigned: [...unassignedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[0]) },
@@ -237,7 +245,7 @@ async function build() {
   ]);
   const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
-    months: sh.months, odoo: { rows: od.rows }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, cdet: ad.cdet || {}, adet: ad.adet || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
+    months: sh.months, odoo: { rows: od.rows, open: od.open || (cached && cached.data.odoo && cached.data.odoo.open) || null }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, cdet: ad.cdet || {}, adet: ad.adet || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
     waReport: { rows: wa.rows }, kpi: kp, ops: op, web: wb,
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],

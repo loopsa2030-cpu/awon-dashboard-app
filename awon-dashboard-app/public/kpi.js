@@ -18,7 +18,7 @@ const T = {
     eqGap: (a, b, more) => `Platform rows below use each platform's own spend plus WhatsApp: ${a}, which is ${b} ${more ? 'more' : 'less'} than the marketing spend because the Daily tab splits ad spend by city (Qassim is filled by hand and campaigns without a city are left out).`,
     mxTitle: 'Spend quality by platform', mxSub: 'For the selected dates. Green is better than the reference, red is worse, grey has no reference.',
     mainKpi: 'Kilograms per $1,000', mainNote: 'The main number: we are a weight business, not a leads business.', ref: 'Reference',
-    openTitle: 'Open orders', openOf: n => `Valid leads in the period: ${n}. Open = leads not yet received.`, withOv: 'With overheads', totalOv: 'Total with overheads', bkPaid: 'Paid ads', bkBrand: 'Branding', ofBudget: 'of', g_tools: 'Tools and subscriptions', g_ugc: 'UGC / IGC', g_production: 'Production', g_services: 'Outsourced services',
+    openTitle: 'Open orders', openOf: n => `Scheduled pickups not yet received or cancelled (as Odoo's "Open Orders by Month").`, withOv: 'With overheads', totalOv: 'Total with overheads', bkPaid: 'Paid ads', bkBrand: 'Branding', ofBudget: 'of', g_tools: 'Tools and subscriptions', g_ugc: 'UGC / IGC', g_production: 'Production', g_services: 'Outsourced services',
     ohNote: 'Tools, UGC/IGC, production and outsourced services are entered per month in Settings and divided by the days of that month. Overheads accrue per completed day (monthly amount / days in the month, up to yesterday) and are included in the Total.', openNote: 'Weight arrives days after the lead, so the last days of the month read lower than the final number.',
     cols: { platform: 'Platform', kgk: 'Kg per $1,000', ldk: 'Leads per $1,000', cpl: 'CPL', cpk: 'Cost per kg', pr: 'Pickup rate', kgo: 'Kg per order', nr: 'Spend with no result', spend: 'Spend', leads: 'Valid leads', kg: 'Kg' },
     dir: { up: 'higher is better', down: 'lower is better' },
@@ -58,7 +58,7 @@ const T = {
     eqGap: (a, b, more) => `صفوف المنصات أدناه تستخدم صرف كل منصة كما تسجله مع الواتساب: ${a}، أي ${more ? 'أكثر' : 'أقل'} بـ ${b} من صرف التسويق لأن التبويب اليومي يقسم صرف الإعلانات حسب المدينة (القصيم يُعبأ يدوياً والحملات بلا مدينة لا تُحسب).`,
     mxTitle: 'جودة الصرف لكل منصة', mxSub: 'للفترة المحددة. الأخضر أفضل من المرجع، والأحمر أسوأ، والرمادي بلا مرجع.',
     mainKpi: 'كيلو لكل 1,000 دولار', mainNote: 'الرقم الرئيسي: نحن في بزنس أوزان، مو بزنس ليدز.', ref: 'المرجع',
-    openTitle: 'الطلبات المفتوحة', openOf: n => `الليدز الصالحة في الفترة: ${n}. المفتوح = ليدز لم تُستلم بعد.`, withOv: 'مع التكاليف الأخرى', totalOv: 'الإجمالي مع التكاليف الأخرى', bkPaid: 'الإعلانات المدفوعة', bkBrand: 'البراندنج', ofBudget: 'من', g_tools: 'الأدوات والاشتراكات', g_ugc: 'UGC / IGC', g_production: 'الإنتاج', g_services: 'الخدمات الخارجية',
+    openTitle: 'الطلبات المفتوحة', openOf: n => `استلامات مجدولة لم تُستلم ولم تُلغَ (مثل فلتر Odoo "Open Orders by Month").`, withOv: 'مع التكاليف الأخرى', totalOv: 'الإجمالي مع التكاليف الأخرى', bkPaid: 'الإعلانات المدفوعة', bkBrand: 'البراندنج', ofBudget: 'من', g_tools: 'الأدوات والاشتراكات', g_ugc: 'UGC / IGC', g_production: 'الإنتاج', g_services: 'الخدمات الخارجية',
     ohNote: 'الأدوات وUGC/IGC والإنتاج والخدمات الخارجية تُدخل شهرياً في الإعدادات وتُقسم على أيام ذلك الشهر. وتُحتسب لكل يوم مكتمل (حتى أمس) وتدخل ضمن الإجمالي.', openNote: 'الكيلو يتأخر عن الليد لأن الاستلام يحصل بعد أيام، لذلك تظهر آخر أيام الشهر أقل من حقيقتها.',
     cols: { platform: 'المنصة', kgk: 'كيلو لكل 1,000$', ldk: 'ليدز لكل 1,000$', cpl: 'تكلفة الليد', cpk: 'تكلفة الكيلو', pr: 'نسبة الاستلام', kgo: 'كيلو لكل طلب', nr: 'صرف بلا نتيجة', spend: 'الصرف', leads: 'الليدز الصالحة', kg: 'الكيلو' },
     dir: { up: 'الأعلى أفضل', down: 'الأقل أفضل' },
@@ -237,7 +237,10 @@ function matrix(ds, from, to) {
     return `<tr class="${p === 'total' ? 'tot' : ''}${p === 'totalOv' ? ' totov' : ''}${p === 'other' ? ' oth' : ''}"><th scope="row">${esc(label)}${sub}</th>${tds}</tr>`;
   };
   const tg = grp.total, mt = metricsOf(tg), mref = R.kgPer1000;
-  const open = Math.max(0, tg.leads - tg.coh);
+  // Open orders as on the Performance tab and the team's Odoo filter: scheduled pickup date in the period (to the end of the
+  // month when the period reaches today) and status not Received or Cancelled; older datasets fall back to leads not yet received
+  const oToday = todayKSA(), oTo = to >= oToday ? to.slice(0, 7) + '-' + String(dim(to.slice(0, 7))).padStart(2, '0') : to;
+  const open = ds.odoo && ds.odoo.open ? ds.odoo.open.reduce((x, [d, , n]) => x + (d >= from && d <= oTo ? n : 0), 0) : Math.max(0, tg.leads - tg.coh);
   const main = `<div class="sp-tiles"><div class="panel sp-main ${cls(mt.kgPer1000, mref, 'up')}"><div class="k">${esc(t('mainKpi'))}</div><div class="v">${num(fN(mt.kgPer1000, 0))}</div>
     <div class="t"><span>${esc(t('ref'))} ${num(fN(mref, 0))}</span></div><p class="muted sm">${esc(t('mainNote'))}</p></div>
     <div class="panel sp-open"><div class="k">${esc(t('openTitle'))}</div><div class="v">${num(fN(open))}</div><div class="t"><span>${esc(t('openOf')(fN(tg.leads)))}</span></div><p class="muted sm">${esc(t('openNote'))}</p></div></div>`;
