@@ -7,7 +7,7 @@ const ads = require('./ads');
 const ACC = {
   google:   { connector: 'google_ads', account: process.env.WINDSOR_GOOGLE_ACCOUNT || '505-956-3249', objective: 'advertising_channel_type', leads: 'conversions', clicks: 'clicks' },
   snapchat: { connector: 'snapchat', account: process.env.WINDSOR_SNAP_ACCOUNT || 'd73ea452-c58a-44e5-aa37-29e3205fcebe', objective: 'objective', leads: 'conversion_sign_ups', clicks: 'swipes' },
-  meta:     { connector: 'facebook', account: process.env.WINDSOR_META_ACCOUNT || '1219983855612087', objective: 'campaign_objective', leads: 'actions_onsite_conversion_messaging_conversation_started_7d', clicks: 'actions_link_click' },
+  meta:     { connector: 'facebook', account: process.env.WINDSOR_META_ACCOUNT || '1219983855612087', objective: 'campaign_objective', leads: 'actions_offsite_conversion_fb_pixel_lead', alt: 'actions_onsite_conversion_messaging_conversation_started_7d', clicks: 'actions_link_click' },   // website leads; click-to-WhatsApp campaigns (no pixel leads) count conversations
   tiktok:   { connector: 'tiktok', account: process.env.WINDSOR_TIKTOK_ACCOUNT || '7282306257200005121', objective: 'objective_type', leads: 'conversions', clicks: 'clicks' },
 };
 const GA4_ACCOUNT = process.env.WINDSOR_GA4_ACCOUNT || '359961543';
@@ -35,12 +35,12 @@ async function query(connector, account, fields, from, to, filter) {
 // Campaign rows: [date, city|'', leadgen(1/0), spend, nativeLeads, clicks]; plus a campaign-id -> name map (Snapchat ids appear in GA4)
 async function platform(name, from, to) {
   const a = ACC[name];
-  const raw = await query(a.connector, a.account, ['date', 'campaign', 'campaign_id', a.objective, 'spend', a.leads, a.clicks], from, to);
+  const raw = await query(a.connector, a.account, ['date', 'campaign', 'campaign_id', a.objective, 'spend', a.leads, ...(a.alt ? [a.alt] : []), a.clicks], from, to);
   const ids = {}, agg = new Map(), byName = new Map();
   for (const r of raw) {
     const date = String(r.date).slice(0, 10), cname = String(r.campaign || '').trim();
     if (r.campaign_id) ids[String(r.campaign_id)] = cname;
-    const sp = Number(r.spend) || 0, ld = Number(r[a.leads]) || 0, ck = Number(r[a.clicks]) || 0;
+    const sp = Number(r.spend) || 0, ld = Number(r[a.leads]) || (a.alt ? Number(r[a.alt]) || 0 : 0), ck = Number(r[a.clicks]) || 0;
     if (!sp && !ld && !ck) continue;
     const city = cityFromText(cname) || '', lg = ads._isLeadgen(ads.PLATFORMS[name], r[a.objective], cname) ? 1 : 0;
     const nk = date + '|' + cname, y = byName.get(nk) || [date, cname, 0, 0, lg];

@@ -55,7 +55,8 @@ function classify(src) {
   let platform = null;
   if (/whatsapp.?paid|paid.?whatsapp/.test(s)) return { group: 'paid', platform: 'meta' };   // Meta click-to-WhatsApp (source live from 22 Sep 2026)
   if (/tiktok.*whatsapp|whatsapp.*tiktok/.test(s)) return { group: 'paid', platform: 'tiktok' };
-  if (/landinggoogle|google/.test(s)) platform = 'google';
+  if (/^(fb|ig|th|an)$/.test(s.trim())) platform = 'meta';   // Meta ads tagged by placement (utm_source fb/ig/th/an), live since 8 Nov 2026
+  else if (/landinggoogle|google/.test(s)) platform = 'google';
   else if (/landingsnap|snapchat/.test(s)) platform = 'snapchat';
   else if (/landingmeta|facebook|instagram/.test(s) && !/organic/.test(s)) platform = 'meta';
   else if (/landingtiktok/.test(s) || (/tiktok/.test(s) && !/organic/.test(s) && !/whatsapp/.test(s))) platform = 'tiktok';
