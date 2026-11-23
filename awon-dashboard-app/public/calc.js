@@ -96,7 +96,7 @@
     for (let r of rows) {
       const [date, city] = r;
       const c = cityOf(city), s = day(date);
-      const shift = r[3] * brShare(date);
+      const shift = 0;   // the Daily tab's Paid spend (column F) is lead-gen only; branding is already in Organic spend (column L)
       brandingMoved += shift;
       r = [...r]; r[3] -= shift; r[5] += shift;
       GROUPS.forEach((g, i) => {

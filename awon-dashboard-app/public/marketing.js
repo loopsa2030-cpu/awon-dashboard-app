@@ -235,7 +235,8 @@ function aggregate(ds, from, to) {
     if (x.organic && !o.organic) { A.org.o_other.leads += x.organic; D.orgLeads += x.organic; (D.org.o_other = D.org.o_other || { leads: 0, visits: 0 }).leads += x.organic; }
     if (x.wa && !o.wa) { A.wa.crm += x.wa; D.waCrm += x.wa; }
   }
-  // Daily tab (sheet): spend for every group, as on Performance. Branding share of paid spend moves to Organic (same rule as Performance).
+  // Daily tab (sheet): spend for every group, as on Performance. The sheet already keeps branding out of Paid spend (column F is
+  // lead-gen only; branding is in the Organic spend, column L), so nothing is moved here; branding is only split by platform.
   const brShare = d => { const x = adLg[d], y = adBr[d], l = x ? x.tot : 0, b = y ? y.tot : 0; return l + b > 0 ? b / (l + b) : (perLg.tot + perBr.tot > 0 ? perBr.tot / (perLg.tot + perBr.tot) : 0); };
   const pick = (...o) => o.find(x => x && x.tot > 0);
   A.alloc = perLg.tot > 0 ? 'ads' : 'crm';
@@ -243,7 +244,7 @@ function aggregate(ds, from, to) {
   for (const m of Object.values(ds.months || {})) for (const r of (m.rows || [])) {
     const [d, c, pl, ps0, ol, os0, wl, ws] = r;
     if (d < from || d > to) continue;
-    const shift = ps0 * brShare(d), ps = ps0 - shift, os = os0 + shift;
+    const ps = ps0, os = os0;
     const D = day(d);
     // paid spend per platform: the city's own ad mix that day, else the day's national mix, else the period mix, else CRM lead mix
     if (ps > 0) {
@@ -254,10 +255,11 @@ function aggregate(ds, from, to) {
         A.paid[p].spend += v; pc(p, c).spend += v; D.paidSpend += v; (D.paid[p] = D.paid[p] || blankP()).spend += v;
       }
     }
-    // branding spend per platform (reported under Organic)
-    if (shift > 0) {
+    // organic (branding) spend per platform, from the sheet's Organic spend and that day's branding mix on the platforms
+    if (os0 > 0) {
       const sh = pick(adBr[d], perBr);
-      for (const [p, v] of Object.entries(sh.p)) { A.paid[p].brand += shift * v / sh.tot; if (!Object.values(ORG_BRAND).includes(p)) orgBrandWeb += shift * v / sh.tot; }
+      if (sh) for (const [p, v] of Object.entries(sh.p)) { A.paid[p].brand += os0 * v / sh.tot; if (!Object.values(ORG_BRAND).includes(p)) orgBrandWeb += os0 * v / sh.tot; }
+      else orgBrandWeb += os0;
     }
     const s = A.sheetCity[c] || (A.sheetCity[c] = { pl: 0, ps: 0, ol: 0, os: 0, wl: 0, ws: 0 });
     s.pl += pl; s.ps += ps; s.ol += ol; s.os += os; s.wl += wl; s.ws += ws;
@@ -278,7 +280,7 @@ function aggregate(ds, from, to) {
   }
   // organic spend per platform: branding of that platform; website gets the sheet's organic spend plus other branding
   for (const [op, bp] of Object.entries(ORG_BRAND)) A.org[op].spend = A.paid[bp].brand;
-  A.org.o_web.spend = A.orgSheetSpend + orgBrandWeb;
+  A.org.o_web.spend = orgBrandWeb;
   // totals
   const P = blankP();
   for (const p of [...PAID, 'untagged']) for (const k of Object.keys(P)) P[k] += A.paid[p][k];
