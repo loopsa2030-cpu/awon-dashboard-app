@@ -19,7 +19,7 @@ const T = {
     snapchat: 'Snapchat', google: 'Google Ads', meta: 'Meta', tiktok: 'TikTok',
     o_web: 'Website organic', o_meta: 'Organic Meta', o_tiktok: 'Organic TikTok', o_snap: 'Organic Snapchat', o_other: 'Partners, PR and other',
     waSrc: 'WhatsApp & CRM',
-    allPlat: 'All platforms', allCities: 'All cities', vCityMix: 'Leads by city', vCityTrend: 'Daily leads by city',
+    allPlat: 'All platforms', allCities: 'All cities', vCityMix: 'Leads by city', vCityTrend: 'Daily leads by city', paceTitle: 'Leads vs target pace per city', paceSub: 'Running total of leads (Daily sheet) vs where the forecast daily target says each city should be by that day. Above the dashed line = ahead. Green on target, amber within 10%, red more than 10% behind.', paceTgt: 'Target to date', paceAct: 'Leads to date',
     vLeads: 'Leads by platform', vCpl: 'CPL by platform', vGap: 'CRM vs native leads', vVisits: 'Visits and CVR', vSpend: 'Spend and CPL',
     mCpl: 'CPL', mLeads: 'Leads', mSpend: 'Spend',
     cohortTitle: 'Week by week per source', weekdayTitle: 'Day of week (average per day)', cityPlatTitle: 'Paid CRM CPL by city and platform',
@@ -77,7 +77,7 @@ const T = {
     snapchat: 'سناب شات', google: 'إعلانات جوجل', meta: 'ميتا', tiktok: 'تيك توك',
     o_web: 'الموقع (عضوي)', o_meta: 'ميتا العضوي', o_tiktok: 'تيك توك العضوي', o_snap: 'سناب العضوي', o_other: 'الشركاء والعلاقات العامة وغيرها',
     waSrc: 'واتساب وإعادة التفعيل',
-    allPlat: 'كل المنصات', allCities: 'كل المدن', vCityMix: 'العملاء حسب المدينة', vCityTrend: 'العملاء يومياً حسب المدينة',
+    allPlat: 'كل المنصات', allCities: 'كل المدن', vCityMix: 'العملاء حسب المدينة', vCityTrend: 'العملاء يومياً حسب المدينة', paceTitle: 'وتيرة العملاء مقابل الهدف لكل مدينة', paceSub: 'المجموع التراكمي للعملاء (الشيت اليومي) مقابل ما يجب أن تصله كل مدينة حتى ذلك اليوم حسب الهدف اليومي في التوقعات. فوق الخط المتقطع = متقدمة. أخضر على الهدف، أصفر ضمن 10%، أحمر متأخرة أكثر من 10%.', paceTgt: 'الهدف حتى اليوم', paceAct: 'العملاء حتى اليوم',
     vLeads: 'العملاء حسب المنصة', vCpl: 'تكلفة العميل حسب المنصة', vGap: 'CRM مقابل المنصة', vVisits: 'الزيارات والتحويل', vSpend: 'الإنفاق وتكلفة العميل',
     mCpl: 'تكلفة العميل', mLeads: 'العملاء', mSpend: 'الإنفاق',
     cohortTitle: 'أسبوعاً بأسبوع لكل مصدر', weekdayTitle: 'حسب يوم الأسبوع (متوسط يومي)', cityPlatTitle: 'تكلفة عميل CRM المدفوع حسب المدينة والمنصة',
@@ -579,6 +579,21 @@ function render({ ds, from, to, lang, perf, cmp }) {
   const heatCell = (x, ref) => { const v = x ? div(x.spend, x.crm) : null; if (v == null || !ref || !x || x.crm < 5) return `<td>${num(v == null ? '-' : fC(v))}</td>`; const r = v / ref - 1, a = Math.min(1, Math.abs(r) * 2);
     return `<td style="background:${r < 0 ? `rgba(12,163,157,${(0.06 + a * 0.5).toFixed(2)})` : `rgba(181,78,55,${(0.05 + a * 0.4).toFixed(2)})`}">${num(fC(v))}<span class="sub">${num(fN(x.crm))}</span></td>`; };
 
+  // pace per city: cumulative Daily-sheet leads vs cumulative forecast daily target ("Daily Leads" column)
+  const paceDays = Object.keys(C.days).filter(d => d >= from && d <= end).sort();
+  const cityTgt = (d, c) => { const f = ds.months && ds.months[d.slice(0, 7)] && ds.months[d.slice(0, 7)].forecast; const x = f && f.cities.find(y => y.city === c);
+    return !x ? 0 : x.dailyLeads || (x.totalLeads || 0) / (f.daysInMonth || dimOf(d.slice(0, 7))); };
+  const paceKeys = [...new Set([...Object.keys(C.sheetCity), ...paceDays.flatMap(d => ((ds.months[d.slice(0, 7)] || {}).forecast || { cities: [] }).cities.map(y => y.city))])]
+    .filter(c => c && c !== 'unknown' && paceDays.some(d => cityTgt(d, c) > 0));
+  const pace = paceKeys.map(c => { let a = 0, t = 0; const act = [], tgt = [];
+    for (const d of paceDays) { const x = C.days[d].sheet[c]; a += x ? x.pl + x.ol + x.wl : 0; t += cityTgt(d, c); act.push(a); tgt.push(Math.round(t)); }
+    return { c, act, tgt, pct: t ? a / t : null }; }).sort((x, y) => y.tgt[y.tgt.length - 1] - x.tgt[x.tgt.length - 1]);
+  if (pace.length > 1) pace.unshift({ c: 'total', act: paceDays.map((_, i) => pace.reduce((s, p) => s + p.act[i], 0)), tgt: paceDays.map((_, i) => pace.reduce((s, p) => s + p.tgt[i], 0)) });
+  if (pace[0] && pace[0].c === 'total') { const k = pace[0]; k.pct = k.tgt[k.tgt.length - 1] ? k.act[k.act.length - 1] / k.tgt[k.tgt.length - 1] : null; }
+  const paceCol = p => p == null ? '#9bb7b9' : p >= 1 ? '#0ca39d' : p >= 0.9 ? '#eda737' : '#b54e37';
+  const paceHtml = pace.length && paceDays.length > 1 ? `<div class="panel" style="margin-top:14px"><h3 class="ch" style="padding:16px 18px 0">${t('paceTitle')}</h3><p class="trend-note" style="padding:2px 18px 0">${esc(t('paceSub'))}</p>
+    <div class="pace-grid">${pace.map((p, i) => `<div class="pace-c"><div class="pace-h"><b>${esc(p.c === 'total' ? t('total') : cityName(p.c))}</b><span style="color:${paceCol(p.pct)}">${num(p.pct == null ? '-' : fP(p.pct, 0))}</span><small>${num(fN(p.act[p.act.length - 1]))} / ${num(fN(p.tgt[p.tgt.length - 1]))}</small></div><div class="pace-w"><canvas id="mkPace${i}"></canvas></div></div>`).join('')}</div></div>` : '';
+
   root.innerHTML = `${srcWarn(ds)}
   <p class="st-legend"><i class="g"></i><i class="w"></i><i class="b"></i>${esc(t('stLegend'))}</p>
   <section><div class="sec-h"><h2>${t('paid')}</h2><p>${esc(vsTxt)}</p></div>${C.alloc === 'crm' ? `<div class="mk-warn">${esc(t('noAds'))}</div>` : ''}
@@ -623,6 +638,7 @@ function render({ ds, from, to, lang, perf, cmp }) {
 
   <section><div class="sec-h"><h2>${t('cities')}</h2></div>
     <div class="panel trend-panel">${chips('cityView', [['mix', t('vCityMix')], ['trend', t('vCityTrend')]])}<div class="trend-cw"><canvas id="mkCity"></canvas></div></div>
+    ${paceHtml}
     <div class="panel" style="margin-top:14px"><div class="tbl-wrap"><table class="mk grp">${cityTable}</table></div></div>
     <div class="panel" style="margin-top:14px"><div class="tbl-head"><h3 class="ch">${t('daily')}</h3>${chips('dayCity', [['all', t('allCities')], ...dayCities.map(c => [c, cityName(c)])])}</div>
       <div class="tbl-wrap tall"><table class="mk grp">${grpHead(t('date'))}<tbody>${dayRows}</tbody><tfoot><tr><td>${esc(t('total'))}</td>${grpCells(dayTotal)}</tr></tfoot></table></div></div>
@@ -722,6 +738,12 @@ function render({ ds, from, to, lang, perf, cmp }) {
       bar(t('wa'), cityOrder.map(c => C.sheetCity[c].wl), '#eda737', 'c')] }, plugins: [stackTotals],
     options: { layout: { padding: { top: 16 } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => fN(v) } } },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fN(c.raw)}` } } } } });
+
+  pace.forEach((p, i) => { const c = paceCol(p.pct); chart('mkPace' + i, { data: { labels: paceDays.map(d => d.slice(5)), datasets: [
+      { type: 'line', label: t('paceAct'), data: p.act, borderColor: c, backgroundColor: c + '22', fill: true, pointRadius: 0, borderWidth: 2, tension: .2 },
+      { type: 'line', label: t('paceTgt'), data: p.tgt, borderColor: '#15373a', borderDash: [4, 3], pointRadius: 0, borderWidth: 1.2, fill: false }] },
+    options: { scales: { x: { display: false }, y: { ticks: { maxTicksLimit: 3, callback: v => fN(v), font: { size: 10 } } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: x => `${x.dataset.label}: ${fN(x.raw)}` } } } } }); });
 
   $$('[data-mk]').forEach(b => b.addEventListener('click', () => { ui[b.dataset.mk] = b.dataset.v; saveUi(); render({ ds, from, to, lang, perf }); }));
 }
