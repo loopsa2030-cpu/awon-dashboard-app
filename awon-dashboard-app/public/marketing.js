@@ -19,7 +19,7 @@ const T = {
     snapchat: 'Snapchat', google: 'Google Ads', meta: 'Meta', tiktok: 'TikTok',
     o_web: 'Website organic', o_meta: 'Organic Meta', o_tiktok: 'Organic TikTok', o_snap: 'Organic Snapchat', o_other: 'Partners, PR and other',
     waSrc: 'WhatsApp & CRM',
-    allPlat: 'All platforms', allCities: 'All cities',
+    allPlat: 'All platforms', allCities: 'All cities', vCityMix: 'Leads by city', vCityTrend: 'Daily leads by city',
     vLeads: 'Leads by platform', vCpl: 'CPL by platform', vGap: 'CRM vs native leads', vVisits: 'Visits and CVR', vSpend: 'Spend and CPL',
     mCpl: 'CPL', mLeads: 'Leads', mSpend: 'Spend',
     cohortTitle: 'Week by week per source', weekdayTitle: 'Day of week (average per day)', cityPlatTitle: 'Paid CRM CPL by city and platform',
@@ -77,7 +77,7 @@ const T = {
     snapchat: 'سناب شات', google: 'إعلانات جوجل', meta: 'ميتا', tiktok: 'تيك توك',
     o_web: 'الموقع (عضوي)', o_meta: 'ميتا العضوي', o_tiktok: 'تيك توك العضوي', o_snap: 'سناب العضوي', o_other: 'الشركاء والعلاقات العامة وغيرها',
     waSrc: 'واتساب وإعادة التفعيل',
-    allPlat: 'كل المنصات', allCities: 'كل المدن',
+    allPlat: 'كل المنصات', allCities: 'كل المدن', vCityMix: 'العملاء حسب المدينة', vCityTrend: 'العملاء يومياً حسب المدينة',
     vLeads: 'العملاء حسب المنصة', vCpl: 'تكلفة العميل حسب المنصة', vGap: 'CRM مقابل المنصة', vVisits: 'الزيارات والتحويل', vSpend: 'الإنفاق وتكلفة العميل',
     mCpl: 'تكلفة العميل', mLeads: 'العملاء', mSpend: 'الإنفاق',
     cohortTitle: 'أسبوعاً بأسبوع لكل مصدر', weekdayTitle: 'حسب يوم الأسبوع (متوسط يومي)', cityPlatTitle: 'تكلفة عميل CRM المدفوع حسب المدينة والمنصة',
@@ -133,7 +133,7 @@ const ORG_GA = { o_web: 'web', o_meta: 'meta', o_tiktok: 'tiktok', o_snap: 'snap
 const ORG_BRAND = { o_meta: 'meta', o_tiktok: 'tiktok', o_snap: 'snapchat' };                    // organic platform -> branding spend platform
 
 let L = 'en', t = k => T[L][k];
-const ui = { paidView: 'leads', orgView: 'leads', cityPlat: 'all', dayCity: 'all', cohortMetric: 'cpl' };
+const ui = { paidView: 'leads', orgView: 'leads', cityPlat: 'all', dayCity: 'all', cohortMetric: 'cpl', cityView: 'mix' };
 try { Object.assign(ui, JSON.parse(localStorage.getItem('awon-mkt-ui') || '{}')); } catch (e) {}
 const saveUi = () => { try { localStorage.setItem('awon-mkt-ui', JSON.stringify(ui)); } catch (e) {} };
 
@@ -622,7 +622,8 @@ function render({ ds, from, to, lang, perf, cmp }) {
   </section>
 
   <section><div class="sec-h"><h2>${t('cities')}</h2></div>
-    <div class="panel"><div class="tbl-wrap"><table class="mk grp">${cityTable}</table></div></div>
+    <div class="panel trend-panel">${chips('cityView', [['mix', t('vCityMix')], ['trend', t('vCityTrend')]])}<div class="trend-cw"><canvas id="mkCity"></canvas></div></div>
+    <div class="panel" style="margin-top:14px"><div class="tbl-wrap"><table class="mk grp">${cityTable}</table></div></div>
     <div class="panel" style="margin-top:14px"><div class="tbl-head"><h3 class="ch">${t('daily')}</h3>${chips('dayCity', [['all', t('allCities')], ...dayCities.map(c => [c, cityName(c)])])}</div>
       <div class="tbl-wrap tall"><table class="mk grp">${grpHead(t('date'))}<tbody>${dayRows}</tbody><tfoot><tr><td>${esc(t('total'))}</td>${grpCells(dayTotal)}</tr></tfoot></table></div></div>
   </section>
@@ -707,6 +708,20 @@ function render({ ds, from, to, lang, perf, cmp }) {
       y2: { position: L === 'ar' ? 'left' : 'right', beginAtZero: true, grid: { display: false }, ticks: { callback: v => '$' + fN(v, 2) } },
       y3: { display: false, beginAtZero: true } },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.dataset.yAxisID === 'y' ? fN(c.raw) : '$' + fN(c.raw, 2)}` } } } } });
+
+  // leads per city (Daily sheet): Paid / Organic / WhatsApp stacked per city, or each city's total leads per day
+  const cityLeads = s => s.pl + s.ol + s.wl;
+  const cityOrder = Object.keys(C.sheetCity).sort((a, b) => cityLeads(C.sheetCity[b]) - cityLeads(C.sheetCity[a]));
+  const CITY_COL = ['#1d4a4f', '#0ca39d', '#eda737', '#b54e37', '#24595f', '#9bb7b9', '#7a5c99', '#5d8a3a', '#c97b9a', '#4d6f8f'];
+  if (ui.cityView === 'trend') chart('mkCity', { data: { labels: lbl, datasets: cityOrder.map((c, i) => line(cityName(c), ds_.map(d => { const x = G(d).sheet[c]; return x ? cityLeads(x) : null; }), CITY_COL[i % CITY_COL.length], 'y', 2)) },
+    options: { scales: { x: {}, y: { beginAtZero: true, ticks: { callback: v => fN(v) } } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: c => `${c.dataset.label}: ${fN(c.raw)}` } } } } });
+  else chart('mkCity', { data: { labels: cityOrder.map(cityName), datasets: [
+      bar(t('paid'), cityOrder.map(c => C.sheetCity[c].pl), '#1d4a4f', 'c'),
+      bar(t('organic'), cityOrder.map(c => C.sheetCity[c].ol), '#0ca39d', 'c'),
+      bar(t('wa'), cityOrder.map(c => C.sheetCity[c].wl), '#eda737', 'c')] }, plugins: [stackTotals],
+    options: { layout: { padding: { top: 16 } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => fN(v) } } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fN(c.raw)}` } } } } });
 
   $$('[data-mk]').forEach(b => b.addEventListener('click', () => { ui[b.dataset.mk] = b.dataset.v; saveUi(); render({ ds, from, to, lang, perf }); }));
 }
