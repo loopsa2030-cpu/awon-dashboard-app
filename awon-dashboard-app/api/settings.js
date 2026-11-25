@@ -35,6 +35,7 @@ function clean(b) {
     refs: { kgPer1000: num(refs.kgPer1000), leadsPer1000: num(refs.leadsPer1000), cpl: num(refs.cpl), cpk: num(refs.cpk), pickupRate: num(refs.pickupRate), kgPerOrder: num(refs.kgPerOrder),
       leadsPer1000By: { meta: num(refs.leadsPer1000By && refs.leadsPer1000By.meta), tiktok: num(refs.leadsPer1000By && refs.leadsPer1000By.tiktok), snapchat: num(refs.leadsPer1000By && refs.leadsPer1000By.snapchat), google: num(refs.leadsPer1000By && refs.leadsPer1000By.google) } },
     noResultMin: num(b.noResultMin) == null ? 50 : num(b.noResultMin),
+    driverCap: num(b.driverCap) == null ? 28 : num(b.driverCap),
     partnerTargets: { active: str(b.partnerTargets && b.partnerTargets.active, 20), leads: num(b.partnerTargets && b.partnerTargets.leads), kg: num(b.partnerTargets && b.partnerTargets.kg) },
     partners: list(b.partners, 60).map(p => ({ name: str(p.name), sources: ids(p.sources), start: str(p.start, 10), end: str(p.end, 10), leads: num(p.leads), kg: num(p.kg),
       cities: strs(p.cities, 12), aliases: strs(p.aliases, 20),

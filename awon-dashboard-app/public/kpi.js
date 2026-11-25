@@ -42,7 +42,7 @@ const T = {
     // settings
     seTitle: 'Settings', seSub: 'Budgets, targets and lists for the new sections. Saved for everyone who opens the dashboard.', seSave: 'Save', seSaved: 'Saved', seUnsaved: 'Unsaved changes', seFail: 'Could not save', seDemo: 'Demo mode: changes stay in this browser only.',
     seMonth: 'Monthly budget and other marketing costs', seMonthSel: 'Month', seBudget: 'Full marketing budget (USD, leave empty to add up all budgets)', seBudgetPaid: 'Paid ads budget (USD)', seBudgetWa: 'WhatsApp budget (USD)', seBudgetBrand: 'Branding budget (USD)', seBudgetM: 'Monthly budget (USD)', seSpendM: 'Monthly spend (USD)', seSvcName: 'Service name', seSvcCost: 'Monthly cost (USD)', seSvcAdd: 'Add a service', seOhHint: d => `Tools, UGC/IGC, production and services are divided by the ${d} days of the selected month. WhatsApp spend keeps coming from the Daily tab.`, g_tools: 'Tools and subscriptions', g_ugc: 'UGC / IGC', g_production: 'Production', g_services: 'Outsourced services',
-    seRefs: 'References and targets for spend quality', seRefKg: 'Kg per $1,000', seRefLd: 'Leads per $1,000 (total)', seRefCpl: 'CPL (USD)', seRefCpk: 'Cost per kg (USD)', seRefPr: 'Pickup rate (%)', seRefKgo: 'Kg per order', seNr: 'Spend-with-no-result limit (USD)',
+    seRefs: 'References and targets for spend quality', seRefKg: 'Kg per $1,000', seRefLd: 'Leads per $1,000 (total)', seRefCpl: 'CPL (USD)', seRefCpk: 'Cost per kg (USD)', seRefPr: 'Pickup rate (%)', seRefKgo: 'Kg per order', seNr: 'Spend-with-no-result limit (USD)', seCap: 'Pickups per driver per day (standard load)',
     sePt: 'Partners', seInit: 'Marketing initiatives', seTeam: '1% per team member', add: 'Add', remove: 'Remove', name: 'Name', sources: 'Odoo sources', srcHint: 'Type a source name and press Enter', campHint: 'Type a campaign name and press Enter', start: 'Start date', end: 'End date',
     status: 'Status', owner: 'Owner', campaigns: 'Linked campaigns', tgtLeads: 'Target leads', tgtKg: 'Target kg', tgtActive: 'Active partners target (e.g. 2-3)', metric: 'Metric', metricManual: 'Manual daily entry', direction: 'Direction', up: 'Higher is better', down: 'Lower is better',
     startVal: 'Start value', days: 'Plan days', manualAdd: 'Add a daily value', date: 'Date', value: 'Value', none: 'Not set yet', partnerGlobal: 'Partner targets for the month',
@@ -81,7 +81,7 @@ const T = {
     tmNoData: 'لا توجد بيانات لهذا الرقم بعد.', tmManualNone: 'لم تُدخل قيمة بعد.',
     seTitle: 'الإعدادات', seSub: 'الميزانيات والأهداف والقوائم للأقسام الجديدة. تُحفظ لكل من يفتح الداش بورد.', seSave: 'حفظ', seSaved: 'تم الحفظ', seUnsaved: 'تعديلات غير محفوظة', seFail: 'تعذر الحفظ', seDemo: 'وضع العرض: التعديلات تبقى في هذا المتصفح فقط.',
     seMonth: 'الميزانية الشهرية وتكاليف التسويق الأخرى', seMonthSel: 'الشهر', seBudget: 'ميزانية التسويق الكاملة (دولار، اتركها فارغة لتُجمع كل الميزانيات)', seBudgetPaid: 'ميزانية الإعلانات المدفوعة (دولار)', seBudgetWa: 'ميزانية الواتساب (دولار)', seBudgetBrand: 'ميزانية البراندنج (دولار)', seBudgetM: 'الميزانية الشهرية (دولار)', seSpendM: 'الصرف الشهري (دولار)', seSvcName: 'اسم الخدمة', seSvcCost: 'التكلفة الشهرية (دولار)', seSvcAdd: 'إضافة خدمة', seOhHint: d => `الأدوات وUGC/IGC والإنتاج والخدمات تُقسم على ${d} يوماً هي أيام الشهر المختار. صرف الواتساب يبقى من التبويب اليومي.`,
-    seRefs: 'مراجع وأهداف جودة الصرف', seRefKg: 'كيلو لكل 1,000$', seRefLd: 'ليدز لكل 1,000$ (الإجمالي)', seRefCpl: 'تكلفة الليد (دولار)', seRefCpk: 'تكلفة الكيلو (دولار)', seRefPr: 'نسبة الاستلام (%)', seRefKgo: 'كيلو لكل طلب', seNr: 'حد «صرف بلا نتيجة» (دولار)',
+    seRefs: 'مراجع وأهداف جودة الصرف', seRefKg: 'كيلو لكل 1,000$', seRefLd: 'ليدز لكل 1,000$ (الإجمالي)', seRefCpl: 'تكلفة الليد (دولار)', seRefCpk: 'تكلفة الكيلو (دولار)', seRefPr: 'نسبة الاستلام (%)', seRefKgo: 'كيلو لكل طلب', seNr: 'حد «صرف بلا نتيجة» (دولار)', seCap: 'استلامات لكل مندوب يومياً (الحمل القياسي)',
     sePt: 'الشركاء', seInit: 'المبادرات التسويقية', seTeam: '١٪ لكل عضو', add: 'إضافة', remove: 'حذف', name: 'الاسم', sources: 'مصادر Odoo', srcHint: 'اكتب اسم المصدر ثم Enter', campHint: 'اكتب اسم الحملة ثم Enter', start: 'تاريخ البداية', end: 'تاريخ النهاية',
     status: 'الحالة', owner: 'المسؤول', campaigns: 'الحملات المرتبطة', tgtLeads: 'مستهدف الليدز', tgtKg: 'مستهدف الكيلو', tgtActive: 'مستهدف الشراكات الفعالة (مثل 2-3)', metric: 'الرقم', metricManual: 'إدخال يومي يدوي', direction: 'الاتجاه', up: 'الأعلى أفضل', down: 'الأقل أفضل',
     startVal: 'رقم البداية', days: 'أيام الخطة', manualAdd: 'إضافة قيمة يومية', date: 'التاريخ', value: 'القيمة', none: 'لم يُحدد بعد', partnerGlobal: 'مستهدفات الشراكات للشهر',
@@ -99,7 +99,7 @@ const AD_PLATS = ['meta', 'tiktok', 'snapchat', 'google'];
 // First-run values from the request document; the settings screen replaces them.
 const DEFAULTS = {
   months: {}, refs: { kgPer1000: 5263, leadsPer1000: 137, cpl: 7.29, cpk: 0.19, pickupRate: null, kgPerOrder: null, leadsPer1000By: { meta: 114, tiktok: 148, snapchat: 140, google: null } },
-  noResultMin: 50, partnerTargets: { active: '2-3', leads: 2100, kg: null }, partners: [], initiatives: [],
+  noResultMin: 50, driverCap: 28, partnerTargets: { active: '2-3', leads: 2100, kg: null }, partners: [], initiatives: [],
   partnerBench: { tiktok: { all: 148, jeddah: 168, riyadh: 128, eastern: 148, madina: 136, asir: 146 }, snapchat: { all: 140, jeddah: 151, riyadh: 141, eastern: 137, madina: 127, asir: 142, taif: 120, mecca: 141 },
     meta: { all: 114, jeddah: 151, riyadh: 111, eastern: 122, madina: 97, asir: 74, taif: 100 }, google: {} },
   partnerCpk: { pick: 2, s: [0.191, 0.206, 0.223], band: 0.03 },
@@ -693,7 +693,7 @@ function settingsHTML(ds) {
     ${['meta', 'tiktok', 'snapchat', 'google'].map(p => fld(t('seRefLd').replace('(total)', '(' + t(p) + ')').replace('(الإجمالي)', '(' + t(p) + ')'), inp('refs.leadsPer1000By.' + p, by[p], 'number', 'step="any"'))).join('')}
     ${fld(t('seRefCpl'), inp('refs.cpl', R.cpl, 'number', 'step="any"'))}${fld(t('seRefCpk'), inp('refs.cpk', R.cpk, 'number', 'step="any"'))}
     ${fld(t('seRefPr'), inp('refs.pickupRate', R.pickupRate, 'number', 'step="any"'))}${fld(t('seRefKgo'), inp('refs.kgPerOrder', R.kgPerOrder, 'number', 'step="any"'))}
-    ${fld(t('seNr'), inp('noResultMin', settings.noResultMin, 'number', 'step="1"'))}</div></section>
+    ${fld(t('seNr'), inp('noResultMin', settings.noResultMin, 'number', 'step="1"'))}${fld(t('seCap'), inp('driverCap', settings.driverCap ?? 28, 'number', 'step="1" min="1"'))}</div></section>
 
   ${partnerSettingsHTML(ds)}
 
@@ -834,5 +834,5 @@ async function render(c) {
 // Other costs per month from Settings, for the Performance tab's total spend (public/calc.js)
 function overheadByMonth() { const o = {}; for (const [m, s] of Object.entries((settings && settings.months) || {})) { const v = OH.reduce((a, g) => a + (Number(monthGroup(s || {}, g).spend) || 0), 0); if (v > 0) o[m] = v; } return o; }
 const announce = () => { try { window.dispatchEvent(new Event('awon-settings')); } catch (e) {} };
-window.AwonKpi = { render, tabLabel: l => T[l].tabSet, overheadByMonth };
+window.AwonKpi = { render, tabLabel: l => T[l].tabSet, overheadByMonth, driverCap: () => (settings && +settings.driverCap > 0 ? +settings.driverCap : 28) };
 })();

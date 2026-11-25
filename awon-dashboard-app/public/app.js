@@ -266,6 +266,7 @@ function recompute() {
   render();
   if (!$('#view-map').hidden) ensureHeat();
 }
+window.addEventListener('awon-settings', () => { renderDrivers(); });
 window.addEventListener('awon-settings', () => { const k = JSON.stringify((window.AwonKpi && AwonKpi.overheadByMonth && AwonKpi.overheadByMonth()) || {}); if (dataset && k !== JSON.stringify(dataset._ohSettings || {})) recompute(); });
 function syncHeat(draw) {
   const { from, to } = resolve(state);
@@ -305,7 +306,7 @@ function render() {
   $('#cmpEdit').hidden = cmpMode !== 'custom';
   const cmpTxt = cmpR ? ' · ' + num(esc(cmpShort())) + (cmpLen && cmpLen[0] !== cmpLen[1] ? ` <span class="len-warn">(${num(esc(t('cmpLen')(cmpLen[0], cmpLen[1])))})</span>` : '') : cmpMode !== 'off' ? ' · ' + esc(t('cmpNone')) : '';
   $('#rangeLabel').innerHTML = `<b>${num(esc(t('dates')(from, to)))}</b>${perf?.range?.lastReported ? ' · ' + esc(t('lastRep')(perf.range.lastReported)) : ''}${cmpTxt}`;
-  renderFresh(); renderPerf(); renderMap(); renderMkt(); renderKpi(); renderOps();
+  renderFresh(); renderPerf(); renderDrivers(); renderMap(); renderMkt(); renderKpi(); renderOps();
 }
 
 // The donor split needs the customer history sheet; without it the server marks it unavailable rather than guessing
@@ -731,6 +732,12 @@ function renderKpi() {
   const view = ['perf', 'mkt', 'pt', 'set'].find(k => !$('#view-' + k).hidden); if (!view) return;
   const { from, to } = resolve(state);
   AwonKpi.render({ ds: dataset, from, to, lang, view }).catch(e => console.error(e));
+}
+// Performance > Cities: driver forecast from paid spend (drivers.js)
+function renderDrivers() {
+  if (!window.AwonDrivers || !dataset) return;
+  const { to } = resolve(state);
+  AwonDrivers.render({ ds: dataset, to, lang, el: 'cityDrivers' });
 }
 function renderOps() {
   if (!window.AwonOps || !dataset || $('#view-ops').hidden) return;

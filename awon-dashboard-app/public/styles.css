@@ -495,3 +495,28 @@ td .dl{white-space:nowrap}
 .pace-w{height:120px;position:relative}
 @media (max-width:900px){.pace-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:480px){.pace-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Performance > Cities: driver forecast from paid spend (drivers.js) */
+.df{margin-top:14px;padding:16px 18px}
+.df-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.df-sub{margin:2px 0 10px;font-size:12.5px}.df-note{font-size:12px;margin:4px 0 6px}.df-ct{margin-top:18px}
+.df-mode{display:flex;align-items:center;gap:6px;font-size:13px}.df-mode .chip,.df-glob .chip{padding:4px 12px;font-size:13px}
+.df-glob{display:flex;align-items:center;gap:12px;background:rgba(12,163,157,.07);border-radius:10px;padding:8px 14px;font-size:13px;margin:6px 0 12px}
+.df-glob input{flex:1;accent-color:var(--petrol)}
+.df-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.df-k{border:1px solid var(--line);border-radius:10px;padding:9px 12px}.df-k small{display:block;color:var(--muted);font-size:11.5px}.df-k b{font-size:20px}.df-k i{font-style:normal;font-size:12px;color:var(--muted)}
+.df-t{width:100%;font-size:13px}.df-t th,.df-t td{text-align:center;vertical-align:middle}.df-t th:first-child,.df-t td:first-child{text-align:start}
+.df-c{font-weight:600}.df-l b,.df-l small{display:block}.df-l small{font-size:11px}
+.df-sp{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:140px}.df-sp input{width:130px;accent-color:var(--petrol)}.df-sp small{font-size:11px}
+.df-bar{position:relative;display:inline-block;width:110px;height:9px;background:rgba(29,74,79,.07);border-radius:5px;vertical-align:middle}
+.df-bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:5px}.df-bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink,#15373a)}
+.df-chip{display:inline-block;padding:3px 10px;border-radius:14px;font-weight:700;font-size:12px;white-space:nowrap}
+.df-chip.add,.df-mv.add{background:#f6e0da;color:#9b3b26}.df-chip.rel{background:#e3eef7;color:#2f5f8a}.df-chip.hold{background:rgba(29,74,79,.07);color:var(--muted)}
+.df-tr{font-size:11.5px;color:var(--muted);text-align:start!important;line-height:1.55;min-width:190px;max-width:230px}.df-tr b{color:var(--ink,#15373a)}
+.df-fit{display:table;margin-top:4px;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:5px;white-space:nowrap}.df-fit.hi{background:#d9f3f1;color:#08786f}.df-fit.md{background:#fcefd6;color:#9a6512}.df-fit.lo{background:#f3e6e2;color:#9b3b26}
+.df-moves{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.df-mv{border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:13px;background:rgba(12,163,157,.05)}
+.df-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.df-cell{border:1px solid var(--line);border-radius:10px;padding:8px 10px}.df-ch{display:flex;justify-content:space-between;gap:6px;font-size:12.5px}.df-cw{height:130px;position:relative}
+.df-empty{padding:14px 18px;color:var(--muted);margin-top:14px}
+@media (max-width:900px){.df-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.df-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.df-grid{grid-template-columns:minmax(0,1fr)}.df-glob{flex-wrap:wrap}}

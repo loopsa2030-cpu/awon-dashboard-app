@@ -80,6 +80,17 @@ async function odooPart(to) {
     ['total_weight:sum'], ['date_deadline:day', 'state_id'])
     .then(gs => gs.map(g => { const d = g.__range && g.__range['date_deadline:day'] && String(g.__range['date_deadline:day'].from).slice(0, 10); return d ? [d, cityKey(stateName(g.state_id)) || 'unknown', g.__count] : null; }).filter(Boolean))
     .catch(e => { console.error('open orders', e.message); return null; });
+  // Drivers: received pickups per city and day with the distinct Delivery Persons who collected them (last 35 days).
+  // Used by the Performance > Cities driver forecast (pickups per driver, drivers working).
+  const dFrom = (() => { const d = new Date(to + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 34); return d.toISOString().slice(0, 10); })();
+  const driversP = odoo.readGroup('crm.lead', [...odoo.SCOPE, ['date_deadline', '>=', dFrom], ['date_deadline', '<=', to], ['delivery_status', '=', '6']],
+    ['total_weight:sum'], ['date_deadline:day', 'state_id', 'delivery_employee_id'])
+    .then(gs => { const m = new Map();
+      for (const g of gs) { const d = g.__range && g.__range['date_deadline:day'] && String(g.__range['date_deadline:day'].from).slice(0, 10); if (!d) continue;
+        const k = d + '|' + (cityKey(stateName(g.state_id)) || 'unknown'), a = m.get(k) || { p: 0, kg: 0, dr: new Set() };
+        a.p += g.__count; a.kg += g.total_weight || 0; if (g.delivery_employee_id) a.dr.add(g.delivery_employee_id[0]); m.set(k, a); }
+      return [...m.entries()].map(([k, a]) => [...k.split('|'), a.p, a.dr.size, r2(a.kg)]); })
+    .catch(e => { console.error('drivers', e.message); return null; });
   const [res, won] = await Promise.all([
     odoo.readGroup('crm.lead', [...odoo.SCOPE, ...odoo.ksaRange('create_date', FIRST_MONTH + '-01', to)],
       ['total_weight:sum'], ['create_date:day', 'state_id', 'source_id', 'stage_id']),
@@ -113,7 +124,7 @@ async function odooPart(to) {
   try { hist = await withTimeout(history.load(), 120000, 'Customer history sheet'); }
   catch (e) { histNote = 'Customer history sheet: ' + e.message; }
   if (!hist || !hist.size) {
-    return { rows: [...agg.values()], open: await openP, donors: { base: FIRST_MONTH + '-01', rows: [], historyPhones: 0, unavailable: true, note: histNote || 'Customer history sheet is empty' },
+    return { rows: [...agg.values()], open: await openP, drivers: await driversP, donors: { base: FIRST_MONTH + '-01', rows: [], historyPhones: 0, unavailable: true, note: histNote || 'Customer history sheet is empty' },
       meta: { mode: 'live', favourites: fav.used, unassigned: [...unassignedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[0]) } };
   }
   const base = Date.parse(FIRST_MONTH + '-01T00:00:00Z');
@@ -144,6 +155,7 @@ async function odooPart(to) {
   } catch (e) { console.error('donors check failed', e.message); }
   return {
     open: await openP,
+    drivers: await driversP,
     rows: [...agg.values()],
     donors: { base: FIRST_MONTH + '-01', rows: donorRows, historyPhones: hist.size, note: null },
     meta: { mode: 'live', favourites: fav.used, unassigned: [...unassignedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[0]) },
@@ -245,7 +257,7 @@ async function build() {
   ]);
   const out = {
     generatedAt: new Date().toISOString(), firstMonth: FIRST_MONTH,
-    months: sh.months, odoo: { rows: od.rows, open: od.open || (cached && cached.data.odoo && cached.data.odoo.open) || null }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, cdet: ad.cdet || {}, adet: ad.adet || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
+    months: sh.months, odoo: { rows: od.rows, open: od.open || (cached && cached.data.odoo && cached.data.odoo.open) || null, drivers: od.drivers || (cached && cached.data.odoo && cached.data.odoo.drivers) || null }, donors: donorsOrPrevious(od.donors), ads: { platforms: ad.platforms, camps: ad.camps || {}, cdet: ad.cdet || {}, adet: ad.adet || {}, ga: ad.ga || [], fetchedAt: ad.fetchedAt || null, source: ad.source || null, errors: (ad.meta && ad.meta.errors) || [] },
     waReport: { rows: wa.rows }, kpi: kp, ops: op, web: wb,
     sources: { sheets: sh.meta, odoo: od.meta, ads: { mode: ad.meta.mode, errors: ad.meta.errors }, waReport: wa.meta },
     notes: [...sh.notes, ...notes],
