@@ -639,6 +639,7 @@ function render({ ds, from, to, lang, perf, cmp }) {
   <section><div class="sec-h"><h2>${t('cities')}</h2></div>
     <div class="panel trend-panel">${chips('cityView', [['mix', t('vCityMix')], ['trend', t('vCityTrend')]])}<div class="trend-cw"><canvas id="mkCity"></canvas></div></div>
     ${paceHtml}
+    <div id="mkDrivers"></div>
     <div class="panel" style="margin-top:14px"><div class="tbl-wrap"><table class="mk grp">${cityTable}</table></div></div>
     <div class="panel" style="margin-top:14px"><div class="tbl-head"><h3 class="ch">${t('daily')}</h3>${chips('dayCity', [['all', t('allCities')], ...dayCities.map(c => [c, cityName(c)])])}</div>
       <div class="tbl-wrap tall"><table class="mk grp">${grpHead(t('date'))}<tbody>${dayRows}</tbody><tfoot><tr><td>${esc(t('total'))}</td>${grpCells(dayTotal)}</tr></tfoot></table></div></div>
@@ -739,6 +740,8 @@ function render({ ds, from, to, lang, perf, cmp }) {
     options: { layout: { padding: { top: 16 } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => fN(v) } } },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fN(c.raw)}` } } } } });
 
+  // driver forecast from paid spend (public/drivers.js), under the city charts
+  if (window.AwonDrivers) AwonDrivers.render({ ds, to, lang: L, el: 'mkDrivers' });
   pace.forEach((p, i) => { const c = paceCol(p.pct); chart('mkPace' + i, { data: { labels: paceDays.map(d => d.slice(5)), datasets: [
       { type: 'line', label: t('paceAct'), data: p.act, borderColor: c, backgroundColor: c + '22', fill: true, pointRadius: 0, borderWidth: 2, tension: .2 },
       { type: 'line', label: t('paceTgt'), data: p.tgt, borderColor: '#15373a', borderDash: [4, 3], pointRadius: 0, borderWidth: 1.2, fill: false }] },

@@ -1,4 +1,4 @@
-// Performance > Cities: driver forecast from paid spend.
+// Marketing > Cities: driver forecast from paid spend.
 // Per city: daily paid spend -> paid leads (response curve fitted on the last 28 reported days of the Daily sheet)
 // + organic and WhatsApp leads (held at the last 7 days) -> pickups (pickups per lead in the last 7 days, so the
 // forecast equals what the drivers actually did at last week's spend) -> drivers needed (pickups / standard load).
